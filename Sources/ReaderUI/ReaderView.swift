@@ -48,6 +48,19 @@ struct ReaderSidebar: View {
                     }
                 }
             }
+            if !model.highlights.isEmpty {
+                Section("Highlights (\(model.highlights.count))") {
+                    ForEach(model.highlights, id: \.highlight.id) { stored in
+                        Button { model.show(stored) } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(stored.anchor.text).lineLimit(2)
+                                Text("Page \(stored.anchor.firstPage + 1)").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
             Section("Contents") {
                 if model.outline.isEmpty {
                     Text("This document has no outline.").foregroundStyle(.secondary)
