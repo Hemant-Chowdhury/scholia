@@ -13,8 +13,10 @@ let package = Package(
             "DocumentKit",
             .product(name: "GRDB", package: "GRDB.swift"),
         ]),
+        .target(name: "ReaderUI", dependencies: ["DocumentKit", "WorkspaceStore"]),
         .target(name: "TestSupport", path: "Tests/TestSupport"),
         .testTarget(name: "DocumentKitTests", dependencies: ["DocumentKit", "TestSupport"]),
         .testTarget(name: "WorkspaceStoreTests", dependencies: ["WorkspaceStore", "DocumentKit", "TestSupport"]),
+        .testTarget(name: "ReaderUITests", dependencies: ["ReaderUI", "WorkspaceStore", "DocumentKit", "TestSupport"]),
     ]
 )
