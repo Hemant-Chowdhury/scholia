@@ -20,6 +20,14 @@ public struct NavigationRequest: Equatable {
     public static func == (lhs: NavigationRequest, rhs: NavigationRequest) -> Bool { lhs.id == rhs.id }
 }
 
+/// A request to set the selection in the PDF view. Each request has a new ID.
+public struct SelectionRequest: Equatable {
+    public let id = UUID()
+    public let selection: PDFSelection?
+
+    public static func == (lhs: SelectionRequest, rhs: SelectionRequest) -> Bool { lhs.id == rhs.id }
+}
+
 /// State and actions of one reader window.
 @MainActor
 @Observable
@@ -33,6 +41,11 @@ public final class ReaderModel {
     public private(set) var searchResults: [SearchResult] = []
     public private(set) var navigationRequest: NavigationRequest?
     public private(set) var lastError: String?
+    public private(set) var selection: PDFSelection?
+    public private(set) var selectionRequest: SelectionRequest?
+    @ObservationIgnored private let source: PDFDocumentSource
+    @ObservationIgnored private var paragraphCache: [Int: [Paragraph]] = [:]
+    @ObservationIgnored private var selectedParagraphs: [Paragraph] = []
     @ObservationIgnored private var indexTask: Task<Void, Never>?
 
     public init(workspace: OpenedWorkspace, pdfURL: URL) throws {
@@ -41,6 +54,7 @@ public final class ReaderModel {
         let lastPage = min(max(stored.lastPage, 0), max(source.pdf.pageCount - 1, 0))
         self.workspace = workspace
         self.pdfURL = pdfURL
+        self.source = source
         self.pdf = source.pdf
         self.outline = source.outline
         self.currentPage = lastPage
@@ -58,6 +72,54 @@ public final class ReaderModel {
         } catch {
             lastError = "Reader cannot save the current page: \(error.localizedDescription)"
         }
+    }
+
+    public var selectedText: String? { selection?.string }
+
+    public func selectionDidChange(_ selection: PDFSelection?) {
+        let text = selection?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        self.selection = text.isEmpty ? nil : selection
+        selectedParagraphs = []
+    }
+
+    /// Selects the paragraph at the point, or adds the next paragraph when the point is in the current
+    /// paragraph selection. Returns false when no paragraph is at the point.
+    @discardableResult
+    public func optionClick(at point: CGPoint, onPage pageIndex: Int) -> Bool {
+        guard let hit = paragraphs(onPage: pageIndex).first(where: { $0.rect.insetBy(dx: -2, dy: -2).contains(point) })
+        else { return false }
+        if selectedParagraphs.contains(hit) {
+            if let last = selectedParagraphs.last, let next = paragraph(after: last) {
+                selectedParagraphs.append(next)
+            }
+        } else {
+            selectedParagraphs = [hit]
+        }
+        let segments = selectedParagraphs
+            .filter { $0.textRange.location != NSNotFound }
+            .map { PDFLocator.Segment(pageIndex: $0.pageIndex, location: $0.textRange.location, length: $0.textRange.length) }
+        let newSelection = PDFLocator(segments: segments).selection(in: pdf)
+        selection = newSelection
+        selectionRequest = SelectionRequest(selection: newSelection)
+        return true
+    }
+
+    private func paragraphs(onPage pageIndex: Int) -> [Paragraph] {
+        if let cached = paragraphCache[pageIndex] { return cached }
+        let paragraphs = source.paragraphs(onPage: pageIndex)
+        paragraphCache[pageIndex] = paragraphs
+        return paragraphs
+    }
+
+    private func paragraph(after paragraph: Paragraph) -> Paragraph? {
+        let samePage = paragraphs(onPage: paragraph.pageIndex)
+        if paragraph.index + 1 < samePage.count { return samePage[paragraph.index + 1] }
+        let upper = min(paragraph.pageIndex + 4, pdf.pageCount)
+        guard paragraph.pageIndex + 1 < upper else { return nil }
+        for page in (paragraph.pageIndex + 1)..<upper {
+            if let first = paragraphs(onPage: page).first { return first }
+        }
+        return nil
     }
 
     public func go(toPage pageIndex: Int) {
