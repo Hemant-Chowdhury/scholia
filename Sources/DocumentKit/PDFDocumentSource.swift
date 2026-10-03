@@ -6,6 +6,7 @@ public final class PDFDocumentSource {
     public let pdf: PDFDocument
 
     public init(url: URL) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else { throw DocumentError.notFound(url) }
         guard let pdf = PDFDocument(url: url) else { throw DocumentError.cannotOpen(url) }
         if pdf.isLocked { throw DocumentError.locked(url) }
         self.url = url

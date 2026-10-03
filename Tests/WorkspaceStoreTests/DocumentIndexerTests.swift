@@ -56,6 +56,23 @@ struct DocumentIndexerTests {
         #expect(try workspace.database.paragraphs(documentID: workspace.document.id, pages: 0..<3).count == 3)
     }
 
+    @Test func secondRunDuringFirstRunWaitsAndDoesNoWork() async throws {
+        let url = try FixturePDF.make(pages: (0..<6).map { FixturePDF.paragraph(["Page \($0) text."], top: 700) })
+        let workspace = try WorkspaceManager(paths: AppPaths(root: root)).open(pdfAt: url)
+        let second = SecondRun()
+        try DocumentIndexer.run(workspace: workspace, pdfURL: url) { progress in
+            guard progress.indexedPages == 1 else { return }
+            second.start { try DocumentIndexer.run(workspace: workspace, pdfURL: url, progress: second.record) }
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+        try await second.task?.value
+
+        #expect(second.reports == [IndexProgress(indexedPages: 6, pageCount: 6)])
+        let files = try FileManager.default.contentsOfDirectory(atPath: workspace.textFolder.path)
+        #expect(files == ["01-pages-1-6.md"])
+        #expect(try workspace.database.paragraphs(documentID: workspace.document.id, pages: 0..<6).count == 6)
+    }
+
     @Test func secondRunAfterCompletionChangesNothing() throws {
         let url = try threePagePDF()
         let workspace = try WorkspaceManager(paths: AppPaths(root: root)).open(pdfAt: url)
@@ -73,5 +90,26 @@ struct DocumentIndexerTests {
         #expect(document.textExported)
         let file = try String(contentsOf: workspace.textFolder.appendingPathComponent("01-pages-1-1.md"), encoding: .utf8)
         #expect(file == "# Pages 1–1\n")
+    }
+}
+
+/// Starts a second indexer run on another thread and records its progress reports.
+private final class SecondRun: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _reports: [IndexProgress] = []
+    private(set) var task: Task<Void, any Error>?
+
+    var reports: [IndexProgress] { lock.withLock { _reports } }
+
+    func record(_ progress: IndexProgress) { lock.withLock { _reports.append(progress) } }
+
+    /// Returns after the second run has started.
+    func start(_ body: @escaping @Sendable () throws -> Void) {
+        let started = DispatchSemaphore(value: 0)
+        task = Task.detached {
+            started.signal()
+            try body()
+        }
+        started.wait()
     }
 }

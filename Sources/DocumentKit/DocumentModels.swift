@@ -57,11 +57,14 @@ public struct Paragraph: Equatable, Sendable {
 }
 
 public enum DocumentError: Error, Equatable, LocalizedError {
+    case notFound(URL)
     case cannotOpen(URL)
     case locked(URL)
 
     public var errorDescription: String? {
         switch self {
+        case .notFound(let url):
+            "Reader cannot find this file at \(url.path). If you moved it, open it again from its new location."
         case .cannotOpen: "This file is not a valid PDF, or it is damaged."
         case .locked: "This PDF has a password. Reader cannot open it."
         }

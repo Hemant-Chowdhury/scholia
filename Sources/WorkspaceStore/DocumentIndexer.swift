@@ -19,6 +19,14 @@ public enum DocumentIndexer {
     public static func run(
         workspace: OpenedWorkspace, pdfURL: URL, progress: @Sendable (IndexProgress) -> Void = { _ in }
     ) throws {
+        try workspace.database.indexLock.withLock { _ in
+            try runLocked(workspace: workspace, pdfURL: pdfURL, progress: progress)
+        }
+    }
+
+    private static func runLocked(
+        workspace: OpenedWorkspace, pdfURL: URL, progress: @Sendable (IndexProgress) -> Void
+    ) throws {
         let database = workspace.database
         guard let document = try database.document(id: workspace.document.id) else { return }
         if document.indexedPages >= document.pageCount && document.textExported {
@@ -45,6 +53,7 @@ public enum DocumentIndexer {
             try FileManager.default.removeItem(at: old)
         }
         for chunk in ChapterSplitter.chunks(outline: source.outline, pageCount: pageCount) {
+            try Task.checkCancellation()
             let byPage = Dictionary(grouping: try database.paragraphs(documentID: documentID, pages: chunk.pages), by: \.pageIndex)
             var body = "# \(chunk.title)\n"
             for page in chunk.pages {

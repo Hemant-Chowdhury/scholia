@@ -40,6 +40,31 @@ struct ChapterSplitterTests {
         ])
     }
 
+    @Test func longChapterIsSplitAtItsSections() {
+        let outline = [
+            OutlineEntry(title: "Part 1", level: 0, pageIndex: 0),
+            OutlineEntry(title: "Coroutines", level: 1, pageIndex: 10),
+            OutlineEntry(title: "Flows", level: 1, pageIndex: 45),
+        ]
+        #expect(ChapterSplitter.chunks(outline: outline, pageCount: 80) == [
+            TextChunk(fileName: "01-part-1.md", title: "Part 1", pages: 0..<10),
+            TextChunk(fileName: "02-coroutines.md", title: "Coroutines", pages: 10..<45),
+            TextChunk(fileName: "03-flows.md", title: "Flows", pages: 45..<80),
+        ])
+    }
+
+    @Test func longSectionWithoutChildrenIsSplitIntoPageBlocks() {
+        let outline = [
+            OutlineEntry(title: "Book", level: 0, pageIndex: 0),
+            OutlineEntry(title: "Big", level: 1, pageIndex: 0),
+        ]
+        #expect(ChapterSplitter.chunks(outline: outline, pageCount: 50) == [
+            TextChunk(fileName: "01-big-pages-1-20.md", title: "Big, pages 1–20", pages: 0..<20),
+            TextChunk(fileName: "02-big-pages-21-40.md", title: "Big, pages 21–40", pages: 20..<40),
+            TextChunk(fileName: "03-big-pages-41-50.md", title: "Big, pages 41–50", pages: 40..<50),
+        ])
+    }
+
     @Test func noPagesGiveNoChunks() {
         #expect(ChapterSplitter.chunks(outline: [], pageCount: 0).isEmpty)
     }

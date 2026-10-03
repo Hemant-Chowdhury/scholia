@@ -1,9 +1,12 @@
 import Foundation
 import GRDB
+import Synchronization
 
 /// The SQLite database of one workspace.
 public final class WorkspaceDatabase: Sendable {
     let queue: DatabaseQueue
+    /// Held while an indexer runs, so two windows of one workspace never index or export at the same time.
+    let indexLock = Mutex(())
 
     public convenience init(path: URL) throws {
         try self.init(queue: DatabaseQueue(path: path.path))

@@ -61,6 +61,13 @@ struct PDFDocumentSourceTests {
         #expect(throws: DocumentError.cannotOpen(url)) { try PDFDocumentSource(url: url) }
     }
 
+    @Test func missingFileThrowsNotFound() {
+        let url = URL(fileURLWithPath: "/nonexistent/moved-book.pdf")
+        #expect(throws: DocumentError.notFound(url)) { try PDFDocumentSource(url: url) }
+        #expect(DocumentError.notFound(url).errorDescription
+            == "Reader cannot find this file at /nonexistent/moved-book.pdf. If you moved it, open it again from its new location.")
+    }
+
     @Test func lockedFileThrowsLocked() throws {
         let url = try FixturePDF.makeLocked()
         #expect(throws: DocumentError.locked(url)) { try PDFDocumentSource(url: url) }
