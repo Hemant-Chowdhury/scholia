@@ -43,6 +43,7 @@ public final class ReaderModel {
     public private(set) var lastError: String?
     public private(set) var selection: PDFSelection?
     public private(set) var selectionRequest: SelectionRequest?
+    public private(set) var highlights: [StoredHighlight]
     @ObservationIgnored private let source: PDFDocumentSource
     @ObservationIgnored private var paragraphCache: [Int: [Paragraph]] = [:]
     @ObservationIgnored private var selectedParagraphs: [Paragraph] = []
@@ -60,6 +61,7 @@ public final class ReaderModel {
         self.currentPage = lastPage
         self.indexProgress = IndexProgress(indexedPages: stored.indexedPages, pageCount: stored.pageCount)
         self.navigationRequest = NavigationRequest(pageIndex: lastPage, selection: nil)
+        self.highlights = try workspace.database.highlights(documentID: workspace.document.id)
     }
 
     public var structuralPath: [String] { StructuralPath.path(forPage: currentPage, in: outline) }
@@ -120,6 +122,44 @@ public final class ReaderModel {
             if let first = paragraphs(onPage: page).first { return first }
         }
         return nil
+    }
+
+    public var selectionHighlights: [StoredHighlight] {
+        guard let selection, let locator = PDFLocator(selection: selection, in: pdf) else { return [] }
+        return highlights.filter { (try? PDFLocator.from(json: $0.anchor.locatorJSON))?.overlaps(locator) == true }
+    }
+
+    public func highlightSelection() {
+        guard let selection, let locator = PDFLocator(selection: selection, in: pdf), selectionHighlights.isEmpty else { return }
+        do {
+            let now = Date()
+            let anchor = AnchorRecord(
+                id: UUID().uuidString, documentID: workspace.document.id, kind: DocumentKind.pdf.rawValue,
+                locatorJSON: try locator.json(), text: selection.string ?? "",
+                structuralPath: StructuralPath.path(forPage: locator.firstPage, in: outline).joined(separator: " › "),
+                firstPage: locator.firstPage, createdAt: now)
+            let highlight = HighlightRecord(id: UUID().uuidString, anchorID: anchor.id, color: "yellow", createdAt: now)
+            try workspace.database.addHighlight(highlight, anchor: anchor)
+            highlights = try workspace.database.highlights(documentID: workspace.document.id)
+        } catch {
+            lastError = "Reader cannot save the highlight: \(error.localizedDescription)"
+        }
+    }
+
+    public func removeSelectionHighlights() {
+        do {
+            for stored in selectionHighlights {
+                try workspace.database.removeHighlight(id: stored.highlight.id)
+            }
+            highlights = try workspace.database.highlights(documentID: workspace.document.id)
+        } catch {
+            lastError = "Reader cannot remove the highlight: \(error.localizedDescription)"
+        }
+    }
+
+    public func show(_ highlight: StoredHighlight) {
+        let selection = (try? PDFLocator.from(json: highlight.anchor.locatorJSON))?.selection(in: pdf)
+        navigationRequest = NavigationRequest(pageIndex: highlight.anchor.firstPage, selection: selection)
     }
 
     public func go(toPage pageIndex: Int) {
