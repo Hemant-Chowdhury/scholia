@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v15)],
     targets: [
         .target(name: "DocumentKit"),
-        .testTarget(name: "DocumentKitTests", dependencies: ["DocumentKit"]),
+        .target(name: "TestSupport", path: "Tests/TestSupport"),
+        .testTarget(name: "DocumentKitTests", dependencies: ["DocumentKit", "TestSupport"]),
     ]
 )
