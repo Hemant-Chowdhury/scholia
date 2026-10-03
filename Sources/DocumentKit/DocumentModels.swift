@@ -34,10 +34,13 @@ public struct OutlineEntry: Equatable, Sendable {
 public struct TextLine: Equatable, Sendable {
     public let text: String
     public let rect: CGRect
+    /// Character range of the line in the page text. The location is `NSNotFound` when it is not known.
+    public let range: NSRange
 
-    public init(text: String, rect: CGRect) {
+    public init(text: String, rect: CGRect, range: NSRange = NSRange(location: NSNotFound, length: 0)) {
         self.text = text
         self.rect = rect
+        self.range = range
     }
 }
 
@@ -47,12 +50,16 @@ public struct Paragraph: Equatable, Sendable {
     public let index: Int
     public let text: String
     public let rect: CGRect
+    /// Character range of the paragraph in the page text. The location is `NSNotFound` when it is not known.
+    public let textRange: NSRange
 
-    public init(pageIndex: Int, index: Int, text: String, rect: CGRect) {
+    public init(pageIndex: Int, index: Int, text: String, rect: CGRect,
+                textRange: NSRange = NSRange(location: NSNotFound, length: 0)) {
         self.pageIndex = pageIndex
         self.index = index
         self.text = text
         self.rect = rect
+        self.textRange = textRange
     }
 }
 

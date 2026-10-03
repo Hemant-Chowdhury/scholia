@@ -51,19 +51,31 @@ public final class PDFDocumentSource {
         else { return [] }
         return selection.selectionsByLine().compactMap { line in
             guard let text = line.string?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
-            return TextLine(text: text, rect: line.bounds(for: page))
+            return TextLine(text: text, rect: line.bounds(for: page), range: Self.characterRange(of: line, on: page))
         }
+    }
+
+    private static func characterRange(of selection: PDFSelection, on page: PDFPage) -> NSRange {
+        let count = selection.numberOfTextRanges(on: page)
+        guard count > 0 else { return NSRange(location: NSNotFound, length: 0) }
+        return (1..<count).reduce(selection.range(at: 0, on: page)) { NSUnionRange($0, selection.range(at: $1, on: page)) }
     }
 }
 
 extension PDFDocumentSource: DocumentSource {
     public func paragraphs(onPage pageIndex: Int) -> [Paragraph] {
-        ParagraphGrouper.group(lines(onPage: pageIndex)).enumerated().map { index, group in
-            Paragraph(
-                pageIndex: pageIndex,
-                index: index,
-                text: ParagraphGrouper.joinText(group),
-                rect: group.reduce(CGRect.null) { $0.union($1.rect) })
-        }
+        guard pageIndex >= 0, pageIndex < pdf.pageCount, let page = pdf.page(at: pageIndex) else { return [] }
+        let pageBounds = page.bounds(for: .mediaBox)
+        return ParagraphGrouper.group(lines(onPage: pageIndex))
+            .filter { !PageFurniture.isPageNumber($0, pageBounds: pageBounds) }
+            .enumerated()
+            .map { index, group in
+                Paragraph(
+                    pageIndex: pageIndex,
+                    index: index,
+                    text: ParagraphGrouper.joinText(group),
+                    rect: group.reduce(CGRect.null) { $0.union($1.rect) },
+                    textRange: ParagraphGrouper.textRange(of: group))
+            }
     }
 }

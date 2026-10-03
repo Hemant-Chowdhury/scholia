@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 
 /// Groups text lines (in reading order) into paragraphs with layout rules. The rules are not exact;
 /// manual selection is always available to the reader.
@@ -34,6 +35,14 @@ public enum ParagraphGrouper {
             }
         }
         return result
+    }
+
+    /// The union of the line ranges, or a range with location `NSNotFound` when a line has no range.
+    public static func textRange(of lines: [TextLine]) -> NSRange {
+        guard let first = lines.first, lines.allSatisfy({ $0.range.location != NSNotFound }) else {
+            return NSRange(location: NSNotFound, length: 0)
+        }
+        return lines.dropFirst().reduce(first.range) { NSUnionRange($0, $1.range) }
     }
 
     static func startsParagraph(_ line: TextLine, after previous: TextLine, groupMaxX: CGFloat, lineHeight: CGFloat) -> Bool {
