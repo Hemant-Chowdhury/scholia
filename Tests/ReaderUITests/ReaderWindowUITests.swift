@@ -112,11 +112,4 @@ struct ReaderWindowUITests {
         #expect(page.annotations.contains { $0.type == "Highlight" })
     }
 
-    @Test func optionClickInTheMarginSelectsNothing() throws {
-        let url = try helper.makeBook()
-        let hosted = try host(url)
-        try click(hosted, pageIndex: 0, pagePoint: CGPoint(x: 10, y: 10), modifiers: .option)
-        #expect(hosted.model.selection == nil)
-        #expect(Self.selectionBar(in: hosted.window.contentView!) == nil)
-    }
 }

@@ -6,15 +6,15 @@ final class ReaderPDFView: PDFView {
     var onOptionClick: ((Int, CGPoint) -> Bool)?
     var onHighlightKey: (() -> Void)?
 
-    /// Option-click always belongs to Reader. A click with no paragraph under it does nothing, so
-    /// PDFView's own Option-drag (rectangle selection) is not available.
+    /// Option-click on a paragraph selects it. Any other Option-click goes to PDFView, so its
+    /// Option-drag (rectangle selection) still works when it starts outside a paragraph.
     override func mouseDown(with event: NSEvent) {
-        if event.modifierFlags.contains(.option), let onOptionClick {
+        if event.modifierFlags.contains(.option), let onOptionClick, let document {
             let point = convert(event.locationInWindow, from: nil)
-            if let document, let page = page(for: point, nearest: false) {
-                _ = onOptionClick(document.index(for: page), convert(point, to: page))
+            if let page = page(for: point, nearest: false),
+               onOptionClick(document.index(for: page), convert(point, to: page)) {
+                return
             }
-            return
         }
         super.mouseDown(with: event)
     }

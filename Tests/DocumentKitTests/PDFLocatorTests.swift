@@ -63,3 +63,33 @@ struct PDFLocatorTests {
         #expect(locator.selection(in: source.pdf) == nil)
     }
 }
+
+struct PDFLocatorResolveTests {
+    private func source() throws -> PDFDocumentSource {
+        try PDFDocumentSource(url: FixturePDF.make(pages: [
+            FixturePDF.paragraph(["Agents call tools in a loop."], top: 700)
+                + FixturePDF.paragraph(["Planning needs memory."], top: 660),
+        ]))
+    }
+
+    @Test func locatorWithMatchingTextIsUnchanged() throws {
+        let source = try source()
+        let range = try #require(source.paragraphs(onPage: 0).last?.textRange)
+        let locator = PDFLocator(segments: [.init(pageIndex: 0, location: range.location, length: range.length)])
+        #expect(locator.resolved(expectedText: "Planning needs memory.", in: source.pdf) == locator)
+    }
+
+    @Test func shiftedLocatorIsFoundAgainByItsText() throws {
+        let source = try source()
+        let range = try #require(source.paragraphs(onPage: 0).last?.textRange)
+        let shifted = PDFLocator(segments: [.init(pageIndex: 0, location: range.location - 5, length: range.length)])
+        let resolved = try #require(shifted.resolved(expectedText: "Planning needs memory.", in: source.pdf))
+        #expect(resolved.segments == [.init(pageIndex: 0, location: range.location, length: range.length)])
+    }
+
+    @Test func textThatIsNotOnThePageGivesNil() throws {
+        let source = try source()
+        let locator = PDFLocator(segments: [.init(pageIndex: 0, location: 0, length: 10)])
+        #expect(locator.resolved(expectedText: "Words that are not there.", in: source.pdf) == nil)
+    }
+}

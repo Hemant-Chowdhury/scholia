@@ -97,7 +97,7 @@ struct PDFKitView: NSViewRepresentable {
                 drawn[id] = nil
             }
             for stored in highlights where drawn[stored.highlight.id] == nil {
-                guard let locator = try? PDFLocator.from(json: stored.anchor.locatorJSON) else { continue }
+                guard let locator = model.resolvedLocators[stored.highlight.id] else { continue }
                 drawn[stored.highlight.id] = HighlightGeometry.lineRects(for: locator, in: document).compactMap { item in
                     guard let page = document.page(at: item.pageIndex) else { return nil }
                     let annotation = PDFAnnotation(bounds: item.rect, forType: .highlight, withProperties: nil)

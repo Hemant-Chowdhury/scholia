@@ -52,6 +52,26 @@ public struct PDFLocator: Codable, Equatable, Sendable {
         return result
     }
 
+    /// Checks the locator against the text that was saved with it. If the text is different (for example,
+    /// after a PDFKit update changed the character offsets), it searches for the text on the same page.
+    /// Returns nil when the text cannot be found. Only one-page locators are searched again.
+    public func resolved(expectedText: String, in document: PDFDocument) -> PDFLocator? {
+        let words = expectedText.split(whereSeparator: { $0.isWhitespace })
+        guard !words.isEmpty else { return nil }
+        if let current = selection(in: document)?.string,
+           current.split(whereSeparator: { $0.isWhitespace }) == words {
+            return self
+        }
+        let pages = Set(segments.map(\.pageIndex))
+        guard pages.count == 1, let pageIndex = pages.first, pageIndex >= 0, pageIndex < document.pageCount,
+              let pageText = document.page(at: pageIndex)?.string else { return nil }
+        let pattern = words.map { NSRegularExpression.escapedPattern(for: String($0)) }.joined(separator: "\\s+")
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: pageText, range: NSRange(location: 0, length: (pageText as NSString).length))
+        else { return nil }
+        return PDFLocator(segments: [Segment(pageIndex: pageIndex, location: match.range.location, length: match.range.length)])
+    }
+
     public func overlaps(_ other: PDFLocator) -> Bool {
         segments.contains { mine in
             other.segments.contains { theirs in

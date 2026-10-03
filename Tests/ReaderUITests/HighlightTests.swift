@@ -79,4 +79,27 @@ struct HighlightTests {
         #expect(HighlightGeometry.lineRects(for: PDFLocator(segments: [.init(pageIndex: 99, location: 0, length: 3)]),
                                             in: reopened.pdf).isEmpty)
     }
+
+    @Test func shiftedHighlightIsFoundAgainAndMissingTextIsNotDrawn() throws {
+        let url = try helper.makeBook()
+        let model = try helper.openModel(url)
+        let range = try #require(PDFDocumentSource(url: url).paragraphs(onPage: 0).first?.textRange)
+        func add(_ id: String, _ segment: PDFLocator.Segment, text: String) throws {
+            let anchor = AnchorRecord(id: "a-\(id)", documentID: model.workspace.document.id, kind: "pdf",
+                                      locatorJSON: try PDFLocator(segments: [segment]).json(), text: text,
+                                      structuralPath: "", firstPage: 0, createdAt: Date())
+            try model.workspace.database.addHighlight(
+                HighlightRecord(id: id, anchorID: anchor.id, color: "yellow", createdAt: Date()), anchor: anchor)
+        }
+        try add("moved", .init(pageIndex: 0, location: range.location + 3, length: range.length), text: "Agents call tools in a loop.")
+        try add("gone", .init(pageIndex: 0, location: 0, length: 5), text: "Words that are not in this book.")
+
+        let reopened = try helper.openModel(url)
+        let moved = try #require(reopened.resolvedLocators["moved"])
+        #expect(moved.segments.first?.location == range.location)
+        #expect(collapsed(moved.selection(in: reopened.pdf)?.string) == "Agents call tools in a loop.")
+        #expect(reopened.resolvedLocators["gone"] == nil)
+        reopened.optionClick(at: try helper.center(of: 0, onPage: 0, in: url), onPage: 0)
+        #expect(reopened.selectionHighlights.map(\.highlight.id) == ["moved"])
+    }
 }
