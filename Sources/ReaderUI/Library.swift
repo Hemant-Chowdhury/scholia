@@ -9,6 +9,7 @@ public final class Library {
     public private(set) var recents: [RecentDocument] = []
     public private(set) var startupError: String?
     @ObservationIgnored private let manager: WorkspaceManager?
+    @ObservationIgnored private var openReaderWindows = 0
 
     public init(paths: AppPaths? = nil) {
         var manager: WorkspaceManager?
@@ -21,6 +22,17 @@ public final class Library {
         self.manager = manager
         self.startupError = startupError
         refreshRecents()
+    }
+
+    public func readerWindowOpened() {
+        openReaderWindows += 1
+    }
+
+    /// Returns true when the closed window was the last reader window, so the start window can come back.
+    public func readerWindowClosed() -> Bool {
+        guard openReaderWindows > 0 else { return false }
+        openReaderWindows -= 1
+        return openReaderWindows == 0
     }
 
     public func refreshRecents() {

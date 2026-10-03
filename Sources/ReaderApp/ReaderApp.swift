@@ -19,6 +19,7 @@ struct ReaderApp: App {
         Window("Reader", id: "library") {
             LibraryView(library: library)
         }
+        .keyboardShortcut("0")
         .commands {
             CommandGroup(replacing: .newItem) { OpenPDFCommand() }
         }

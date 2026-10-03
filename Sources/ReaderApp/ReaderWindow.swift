@@ -7,6 +7,8 @@ struct ReaderWindow: View {
     let library: Library
     @State private var model: ReaderModel?
     @State private var errorMessage: String?
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
         Group {
@@ -20,6 +22,13 @@ struct ReaderWindow: View {
             }
         }
         .frame(minWidth: 900, minHeight: 600)
+        .onAppear {
+            library.readerWindowOpened()
+            dismissWindow(id: "library")
+        }
+        .onDisappear {
+            if library.readerWindowClosed() { openWindow(id: "library") }
+        }
         .task(id: url) {
             do {
                 model = try await library.openModel(for: url)

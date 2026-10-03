@@ -24,4 +24,19 @@ struct LibraryTests {
         let url = try FixturePDF.makeCorrupt()
         await #expect(throws: DocumentError.cannotOpen(url)) { try await library.openModel(for: url) }
     }
+
+    @Test func closingTheLastReaderWindowIsReported() {
+        let library = Library(paths: paths)
+        library.readerWindowOpened()
+        library.readerWindowOpened()
+        #expect(library.readerWindowClosed() == false)
+        #expect(library.readerWindowClosed() == true)
+    }
+
+    @Test func extraCloseIsNotReportedAsLast() {
+        let library = Library(paths: paths)
+        #expect(library.readerWindowClosed() == false)
+        library.readerWindowOpened()
+        #expect(library.readerWindowClosed() == true)
+    }
 }
