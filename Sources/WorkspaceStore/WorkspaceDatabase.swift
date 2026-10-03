@@ -46,6 +46,28 @@ public final class WorkspaceDatabase: Sendable {
                 );
                 """)
         }
+        migrator.registerMigration("v2-highlight") { db in
+            try db.execute(sql: """
+                CREATE TABLE anchor (
+                    id TEXT PRIMARY KEY,
+                    document_id TEXT NOT NULL REFERENCES document(id) ON DELETE CASCADE,
+                    kind TEXT NOT NULL,
+                    locator_json TEXT NOT NULL,
+                    text TEXT NOT NULL,
+                    structural_path TEXT NOT NULL,
+                    first_page INTEGER NOT NULL,
+                    created_at DATETIME NOT NULL
+                );
+                CREATE INDEX anchor_document_page ON anchor(document_id, first_page);
+                CREATE TABLE highlight (
+                    id TEXT PRIMARY KEY,
+                    anchor_id TEXT NOT NULL REFERENCES anchor(id) ON DELETE CASCADE,
+                    color TEXT NOT NULL,
+                    created_at DATETIME NOT NULL
+                );
+                CREATE INDEX highlight_anchor ON highlight(anchor_id);
+                """)
+        }
         return migrator
     }
 
