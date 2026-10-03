@@ -54,3 +54,15 @@ public final class PDFDocumentSource {
         }
     }
 }
+
+extension PDFDocumentSource: DocumentSource {
+    public func paragraphs(onPage pageIndex: Int) -> [Paragraph] {
+        ParagraphGrouper.group(lines(onPage: pageIndex)).enumerated().map { index, group in
+            Paragraph(
+                pageIndex: pageIndex,
+                index: index,
+                text: ParagraphGrouper.joinText(group),
+                rect: group.reduce(CGRect.null) { $0.union($1.rect) })
+        }
+    }
+}
