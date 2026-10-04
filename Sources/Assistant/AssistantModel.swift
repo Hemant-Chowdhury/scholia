@@ -44,6 +44,7 @@ public final class AssistantModel {
     @ObservationIgnored private var runTask: Task<Void, Never>?
     @ObservationIgnored private var runningHandle: AgentSessionHandle?
     @ObservationIgnored private var currentPage = 0
+    @ObservationIgnored private var lastRun: (userText: String, action: String, firstPrompt: String, resumePrompt: String?)?
 
     public init(workspace: OpenedWorkspace, source: PDFDocumentSource, backend: AgentBackend, defaults: UserDefaults = .standard) {
         self.workspace = workspace
@@ -76,6 +77,9 @@ public final class AssistantModel {
         selectedModel = defaults.string(forKey: Self.modelKey(id))
         modelChoices = []
     }
+
+    /// The models to show: the session's list, or the agent's known models before the first session.
+    public var visibleModelChoices: [ACPChoice] { modelChoices.isEmpty ? selectedAgent.knownModels : modelChoices }
 
     public func selectModel(_ value: String) {
         selectedModel = value
@@ -155,6 +159,12 @@ public final class AssistantModel {
             resumePrompt: ContextBuilder.resumePrompt(input, transcript: transcript))
     }
 
+    /// Runs the last question again (for example, after an agent error).
+    public func retry() {
+        guard !isRunning, let last = lastRun else { return }
+        run(userText: last.userText, action: last.action, firstPrompt: last.firstPrompt, resumePrompt: last.resumePrompt)
+    }
+
     public func quick(_ followUp: QuickFollowUp) {
         self.followUp(followUp.prompt)
     }
@@ -169,6 +179,11 @@ public final class AssistantModel {
     private func run(userText: String, action: String, firstPrompt: String, resumePrompt: String?) {
         guard let thread = currentThread else { return }
         errorMessage = nil
+        lastRun = (userText, action, firstPrompt, resumePrompt ?? ContextBuilder.resumePrompt(
+            promptInput(selection: SelectionContext(text: currentAnchor?.text ?? thread.title, pageIndex: thread.firstPage,
+                                                    structuralPath: [], before: [], after: []),
+                        action: .followup, question: userText, excluding: thread.id),
+            transcript: messages.map { (role: $0.role, content: $0.text) }))
         let user = ChatMessage(id: UUID().uuidString, role: "user", action: action, text: userText, status: "complete",
                                error: nil, createdAt: Date())
         var answer = ChatMessage(id: UUID().uuidString, role: "assistant", action: nil, text: "", status: "streaming",

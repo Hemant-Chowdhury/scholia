@@ -1,9 +1,10 @@
+import Assistant
 import SwiftUI
 import WorkspaceStore
 
 /// The reader window: outline and search results on the left, the PDF on the right.
 public struct ReaderView: View {
-    let model: ReaderModel
+    @Bindable var model: ReaderModel
     @State private var query = ""
 
     public init(model: ReaderModel) {
@@ -18,12 +19,26 @@ public struct ReaderView: View {
             PDFKitView(model: model)
                 .navigationTitle(model.workspace.document.title)
                 .navigationSubtitle(model.structuralPath.joined(separator: " › "))
+                .inspector(isPresented: $model.showAssistant) {
+                    AssistantPanel(reader: model)
+                        .inspectorColumnWidth(min: 320, ideal: 440, max: 760)
+                }
         }
+        .environment(\.openURL, OpenURLAction { url in
+            guard let page = MarkdownBlocks.pageNumber(in: url) else { return .systemAction }
+            model.go(toPage: max(page - 1, 0))
+            return .handled
+        })
         .searchable(text: $query, placement: .sidebar, prompt: "Search in document")
         .onSubmit(of: .search) { model.search(query) }
         .onChange(of: query) { if query.isEmpty { model.search("") } }
         .toolbar {
             ToolbarItem { IndexStatusView(progress: model.indexProgress, error: model.lastError) }
+            ToolbarItem {
+                Button { model.showAssistant.toggle() } label: { Label("Assistant", systemImage: "sparkles") }
+                    .help("Show or hide the assistant (⌥⌘0)")
+                    .keyboardShortcut("0", modifiers: [.command, .option])
+            }
         }
         .task { model.startIndexing() }
         .onDisappear { model.stopIndexing() }

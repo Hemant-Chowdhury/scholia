@@ -19,8 +19,11 @@ struct ReaderWindowUITests {
     }
 
     func host(_ url: URL) throws -> Hosted {
+        try host(model: helper.openModel(url))
+    }
+
+    func host(model: ReaderModel) throws -> Hosted {
         _ = NSApplication.shared
-        let model = try helper.openModel(url)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 900),
                               styleMask: [.titled, .resizable], backing: .buffered, defer: false)
         window.contentView = NSHostingView(rootView: ReaderView(model: model))
@@ -154,8 +157,9 @@ struct ReaderWindowUITests {
                                           context: nil, characters: chars, charactersIgnoringModifiers: chars,
                                           isARepeat: false, keyCode: 4))
         }
-        #expect(ReaderPDFView.isHighlightKey(try key("h", [])))
-        #expect(!ReaderPDFView.isHighlightKey(try key("h", .command)))
-        #expect(!ReaderPDFView.isHighlightKey(try key("j", [])))
+        #expect(ReaderPDFView.readerKey(try key("h", [])) == .highlight)
+        #expect(ReaderPDFView.readerKey(try key("E", [])) == .explain)
+        #expect(ReaderPDFView.readerKey(try key("h", .command)) == nil)
+        #expect(ReaderPDFView.readerKey(try key("j", [])) == nil)
     }
 }

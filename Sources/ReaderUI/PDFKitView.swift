@@ -18,7 +18,7 @@ struct PDFKitView: NSViewRepresentable {
         view.document = model.pdf
         let model = self.model
         view.onOptionClick = { pageIndex, point in model.optionClick(at: point, onPage: pageIndex) }
-        view.onHighlightKey = { model.highlightSelection() }
+        view.onKey = { key in model.handle(key) }
         context.coordinator.observe(view)
         return view
     }
@@ -69,17 +69,16 @@ struct PDFKitView: NSViewRepresentable {
             positionBar(for: model.selection, in: view)
         }
 
-        /// H highlights the selection in this window, also when PDFKit's internal views have the focus.
+        /// H, E, S, D and A work on the selection in this window, also when PDFKit's internal views have the focus.
         /// Typing in a text field (for example, the search field) is not changed.
         private func startKeyMonitor(for view: PDFView) {
             keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak view] event in
-                guard ReaderPDFView.isHighlightKey(event) else { return event }
+                guard let key = ReaderPDFView.readerKey(event) else { return event }
                 let eventWindow = event.window
                 let handled = MainActor.assumeIsolated { () -> Bool in
                     guard let self, let view, eventWindow === view.window,
-                          !(view.window?.firstResponder is NSText), self.model.selection != nil else { return false }
-                    self.model.highlightSelection()
-                    return true
+                          !(view.window?.firstResponder is NSText) else { return false }
+                    return self.model.handle(key)
                 }
                 return handled ? nil : event
             }

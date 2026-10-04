@@ -20,7 +20,7 @@ let package = Package(
         .target(name: "Assistant", dependencies: ["DocumentKit", "WorkspaceStore", "AgentKit"]),
         .target(name: "ReaderUI", dependencies: ["DocumentKit", "WorkspaceStore", "AgentKit", "Assistant"]),
         .executableTarget(name: "ReaderApp", dependencies: ["ReaderUI", "WorkspaceStore"]),
-        .target(name: "TestSupport", path: "Tests/TestSupport"),
+        .target(name: "TestSupport", dependencies: ["AgentKit", "Assistant"], path: "Tests/TestSupport"),
         .testTarget(name: "AgentKitTests", dependencies: ["AgentKit"]),
         .testTarget(name: "AssistantTests", dependencies: ["Assistant", "AgentKit", "WorkspaceStore", "DocumentKit", "TestSupport"]),
         .testTarget(name: "DocumentKitTests", dependencies: ["DocumentKit", "TestSupport"]),

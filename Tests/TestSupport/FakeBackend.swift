@@ -1,31 +1,33 @@
 import AgentKit
 import Foundation
-@testable import Assistant
+import Assistant
 
 /// A scripted agent backend. Each prompt gets the next script; a script is a list of events, or an error.
-final class FakeBackend: AgentBackend, @unchecked Sendable {
-    enum Step { case events([ACPEvent]), fail(String), waitForCancel([ACPEvent]) }
+public final class FakeBackend: AgentBackend, @unchecked Sendable {
+    public enum Step: Sendable { case events([ACPEvent]), fail(String), waitForCancel([ACPEvent]) }
 
-    let lock = NSLock()
-    var scripts: [Step] = []
-    var prompts: [String] = []
-    var sessionsOpened = 0
-    var optionsSet: [(String, String)] = []
-    var installed = true
-    var cancelled = false
+    public let lock = NSLock()
+    public var scripts: [Step] = []
+    public var prompts: [String] = []
+    public var sessionsOpened = 0
+    public var optionsSet: [(String, String)] = []
+    public var installed = true
+    public var cancelled = false
 
-    func availability() async -> [AgentAvailability] {
+    public init() {}
+
+    public func availability() async -> [AgentAvailability] {
         [AgentAvailability(spec: AgentCatalog.claude, status: installed ? .ready : .notInstalled(missing: ["claude"]), executable: nil),
          AgentAvailability(spec: AgentCatalog.opencode, status: .ready, executable: nil)]
     }
 
-    func openSession(agent: AgentSpec, cwd: URL) async throws -> AgentSessionHandle {
+    public func openSession(agent: AgentSpec, cwd: URL) async throws -> AgentSessionHandle {
         guard installed || agent.id != "claude" else { throw AgentError.notInstalled(name: agent.name, missing: ["claude"]) }
         lock.withLock { sessionsOpened += 1 }
         return FakeSession(backend: self)
     }
 
-    func nextStep(for prompt: String) -> Step {
+    public func nextStep(for prompt: String) -> Step {
         lock.withLock {
             prompts.append(prompt)
             return scripts.isEmpty ? .events([.text("ok"), .done(stopReason: "end_turn")]) : scripts.removeFirst()
@@ -33,20 +35,20 @@ final class FakeBackend: AgentBackend, @unchecked Sendable {
     }
 }
 
-struct FakeSession: AgentSessionHandle {
+public struct FakeSession: AgentSessionHandle {
     let backend: FakeBackend
 
-    var configOptions: [ACPConfigOption] {
+    public var configOptions: [ACPConfigOption] {
         [ACPConfigOption(id: "model", name: "Model", currentValue: "opus",
                          choices: [ACPChoice(value: "opus", name: "Opus"), ACPChoice(value: "haiku", name: "Haiku")])]
     }
 
-    func setOption(_ configID: String, _ value: String) async throws -> [ACPConfigOption] {
+    public func setOption(_ configID: String, _ value: String) async throws -> [ACPConfigOption] {
         backend.lock.withLock { backend.optionsSet.append((configID, value)) }
         return [ACPConfigOption(id: "model", name: "Model", currentValue: value, choices: configOptions[0].choices)]
     }
 
-    func prompt(_ text: String) async -> AsyncThrowingStream<ACPEvent, Error> {
+    public func prompt(_ text: String) async -> AsyncThrowingStream<ACPEvent, Error> {
         let step = backend.nextStep(for: text)
         let backend = self.backend
         return AsyncThrowingStream { continuation in
@@ -67,7 +69,7 @@ struct FakeSession: AgentSessionHandle {
         }
     }
 
-    func cancel() async {
+    public func cancel() async {
         backend.lock.withLock { backend.cancelled = true }
     }
 }

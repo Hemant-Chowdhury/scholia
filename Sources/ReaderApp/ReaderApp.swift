@@ -73,6 +73,10 @@ struct ReaderApp: App {
             }
         }
         .defaultSize(width: 1400, height: 950)
+
+        Settings {
+            SettingsView()
+        }
     }
 }
 

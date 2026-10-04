@@ -1,3 +1,4 @@
+import Assistant
 import DocumentKit
 import Foundation
 import Observation
@@ -44,6 +45,11 @@ public final class ReaderModel {
     public private(set) var selection: PDFSelection?
     public private(set) var selectionRequest: SelectionRequest?
     public private(set) var highlights: [StoredHighlight]
+    public let assistant: AssistantModel
+    /// The assistant side panel is open.
+    public var showAssistant = false
+    /// The reader pressed Ask: the panel shows a question field for this selection.
+    public private(set) var pendingAsk: (locator: PDFLocator, text: String)?
     /// The checked location of each highlight, by highlight ID. A highlight whose text cannot be found is missing.
     public private(set) var resolvedLocators: [String: PDFLocator]
     @ObservationIgnored private let source: PDFDocumentSource
@@ -51,7 +57,8 @@ public final class ReaderModel {
     @ObservationIgnored private var selectedParagraphs: [Paragraph] = []
     @ObservationIgnored private var indexTask: Task<Void, Never>?
 
-    public init(workspace: OpenedWorkspace, pdfURL: URL) throws {
+    public init(workspace: OpenedWorkspace, pdfURL: URL, backend: AgentBackend = UnavailableBackend(),
+                defaults: UserDefaults = .standard) throws {
         let source = try PDFDocumentSource(url: pdfURL)
         let stored = try workspace.database.document(id: workspace.document.id) ?? workspace.document
         let lastPage = min(max(stored.lastPage, 0), max(source.pdf.pageCount - 1, 0))
@@ -65,6 +72,7 @@ public final class ReaderModel {
         self.navigationRequest = NavigationRequest(pageIndex: lastPage, selection: nil)
         let highlights = try workspace.database.highlights(documentID: workspace.document.id)
         self.highlights = highlights
+        self.assistant = AssistantModel(workspace: workspace, source: source, backend: backend, defaults: defaults)
         self.resolvedLocators = Self.resolve(highlights, in: source.pdf)
     }
 
@@ -73,6 +81,7 @@ public final class ReaderModel {
     public func pageDidChange(to pageIndex: Int) {
         guard pageIndex != currentPage else { return }
         currentPage = pageIndex
+        assistant.pageChanged(pageIndex)
         do {
             try workspace.database.setLastPage(pageIndex, documentID: workspace.document.id)
         } catch {
@@ -178,6 +187,42 @@ public final class ReaderModel {
     public func show(_ highlight: StoredHighlight) {
         let selection = resolvedLocators[highlight.highlight.id]?.selection(in: pdf)
         navigationRequest = NavigationRequest(pageIndex: highlight.anchor.firstPage, selection: selection)
+    }
+
+    /// Runs an assistant action on the current selection. Ask first shows a question field in the panel.
+    public func run(_ action: ReadingAction) {
+        guard let selection, let locator = PDFLocator(selection: selection, in: pdf) else { return }
+        showAssistant = true
+        if action == .ask {
+            pendingAsk = (locator, selection.string ?? "")
+            return
+        }
+        pendingAsk = nil
+        assistant.start(action: action, question: nil, locator: locator, selectedText: selection.string ?? "")
+    }
+
+    public func submitAsk(_ question: String) {
+        let text = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let ask = pendingAsk, !text.isEmpty else { return }
+        pendingAsk = nil
+        assistant.start(action: .ask, question: text, locator: ask.locator, selectedText: ask.text)
+    }
+
+    public func cancelAsk() {
+        pendingAsk = nil
+    }
+
+    /// Opens a thread in the panel and shows its text in the PDF.
+    public func open(_ thread: ThreadRecord) {
+        assistant.open(thread: thread)
+        showAssistant = true
+        guard let anchor = assistant.currentAnchor,
+              let locator = (try? PDFLocator.from(json: anchor.locatorJSON))?.resolved(expectedText: anchor.text, in: pdf)
+        else {
+            go(toPage: thread.firstPage)
+            return
+        }
+        navigationRequest = NavigationRequest(pageIndex: locator.firstPage, selection: locator.selection(in: pdf))
     }
 
     public func go(toPage pageIndex: Int) {

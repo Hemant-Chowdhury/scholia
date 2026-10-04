@@ -21,6 +21,8 @@ public struct AgentSpec: Sendable, Equatable, Identifiable {
     /// Settings that Reader applies to each new session (for example, a read-only mode).
     public let sessionSettings: [Setting]
     public let note: String?
+    /// Models to show before the first session reports its own list.
+    public var knownModels: [ACPChoice] = []
 }
 
 public enum AgentCatalog {
@@ -36,7 +38,9 @@ public enum AgentCatalog {
             "strictMcpConfig": .bool(true),
             "disallowedTools": .array(["Bash", "Edit", "Write", "MultiEdit", "NotebookEdit", "Agent", "Task"].map(JSONValue.string)),
         ])])]),
-        sessionSettings: [], note: nil)
+        sessionSettings: [], note: nil,
+        knownModels: [ACPChoice(value: "opus", name: "Opus"), ACPChoice(value: "sonnet", name: "Sonnet"),
+                      ACPChoice(value: "haiku", name: "Haiku")])
 
     /// OpenCode. Its read-only "plan" mode is used; a changed tool set makes its free tier refuse requests.
     public static let opencode = AgentSpec(
@@ -65,7 +69,8 @@ public enum AgentStatus: Sendable, Equatable {
     case notSupportedYet
 }
 
-public struct AgentAvailability: Sendable, Equatable {
+public struct AgentAvailability: Sendable, Equatable, Identifiable {
+    public var id: String { spec.id }
     public let spec: AgentSpec
     public let status: AgentStatus
     /// The program to start (the first word of the command), when it is installed.
