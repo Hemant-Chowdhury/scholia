@@ -104,4 +104,27 @@ struct StudyModelTests {
         #expect(reader.assistant.messages.last?.text == "Agents loop over tools.")
         _ = texts
     }
+
+    @Test func selectingAnotherQuestionWhileAnAnswerRunsKeepsTheCurrentOne() async throws {
+        let (reader, backend) = try await readerWithThreads()
+        let study = StudyModel(reader: reader)
+        let items = study.sections.flatMap(\.items)
+        study.select(items[1].id)
+        backend.scripts = [.waitForCancel([.text("Running")])]
+        reader.assistant.followUp("More?")
+        for _ in 0..<200 where reader.assistant.messages.last?.text != "Running" { try await Task.sleep(for: .milliseconds(5)) }
+        study.select(items[0].id)
+        #expect(study.selectedID == items[1].id)
+        #expect(reader.assistant.currentThread?.id == items[1].id)
+        reader.assistant.stop()
+    }
+
+    @Test func studyFollowsTheThreadThatTheBookWindowOpens() async throws {
+        let (reader, _) = try await readerWithThreads()
+        let study = StudyModel(reader: reader)
+        let items = study.sections.flatMap(\.items)
+        reader.assistant.open(thread: items[0].thread)
+        study.follow(reader.assistant.currentThread?.id)
+        #expect(study.selectedID == items[0].id)
+    }
 }

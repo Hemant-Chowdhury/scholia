@@ -19,6 +19,16 @@ public final class Library {
 
     private struct WeakReader { weak var model: ReaderModel? }
 
+    /// Changes when a book window opens or closes (the Study window watches it).
+    public private(set) var readerVersion = 0
+
+    /// A book window closed: its reader is no longer the reader of the workspace (if a newer one did not replace it).
+    public func readerClosed(_ model: ReaderModel) {
+        guard readers[model.workspace.id]?.model === model else { return }
+        readers[model.workspace.id] = nil
+        readerVersion += 1
+    }
+
     public func reader(forWorkspace id: String) -> ReaderModel? {
         readers[id]?.model
     }
@@ -62,6 +72,7 @@ public final class Library {
         refreshRecents()
         let model = try ReaderModel(workspace: workspace, pdfURL: url, backend: await backend())
         readers[workspace.id] = WeakReader(model: model)
+        readerVersion += 1
         return model
     }
 

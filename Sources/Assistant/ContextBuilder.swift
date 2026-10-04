@@ -98,6 +98,7 @@ public struct PromptInput: Sendable {
 /// Makes the prompt that the agent receives (spec 5.2). Each part has a size limit in characters.
 public enum ContextBuilder {
     static let aboutMeLimit = 2000
+    static let rulesLimit = 4000
     static let selectionLimit = 6000
     static let paragraphLimit = 1200
     static let passageLimit = 600
@@ -131,7 +132,7 @@ public enum ContextBuilder {
 
     private static func context(_ input: PromptInput) -> [String] {
         let selection = input.selection
-        var parts = [input.templates.resolved(\.rules)]
+        var parts = [clip(input.templates.resolved(\.rules), rulesLimit)]
         let author = input.book.author.map { " by \($0)" } ?? ""
         let path = selection.structuralPath.isEmpty ? "" : selection.structuralPath.joined(separator: " › ") + " "
         parts.append("Book: \"\(input.book.title)\"\(author)\nLocation: \(path)(page \(selection.pageIndex + 1))")

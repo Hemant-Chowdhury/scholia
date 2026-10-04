@@ -39,4 +39,20 @@ struct LibraryTests {
         library.readerWindowOpened()
         #expect(library.readerWindowClosed() == true)
     }
+
+    @Test func closedBookWindowIsNoLongerTheReaderOfItsWorkspace() async throws {
+        let library = Library(paths: paths)
+        let url = try FixturePDF.make(pages: [[FixtureLine("Text", y: 700)]])
+        let first = try await library.openModel(for: url)
+        let id = first.workspace.id
+        #expect(library.reader(forWorkspace: id) === first)
+        let version = library.readerVersion
+        library.readerClosed(first)
+        #expect(library.reader(forWorkspace: id) == nil)
+        #expect(library.readerVersion > version)
+        let second = try await library.openModel(for: url)
+        #expect(library.reader(forWorkspace: id) === second)
+        library.readerClosed(first)
+        #expect(library.reader(forWorkspace: id) === second)
+    }
 }

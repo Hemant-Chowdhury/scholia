@@ -63,6 +63,13 @@ final class SelectionBarView: NSVisualEffectView {
                   symbol: value ? "eraser" : "highlighter", help: value ? "Remove the highlight" : "Highlight (H)")
     }
 
+    /// Shows only the icons (the titles stay as tooltips) when the bar does not fit the view.
+    func setCompact(_ compact: Bool) {
+        for button in subviews.flatMap(\.subviews).compactMap({ $0 as? NSButton }) {
+            button.imagePosition = compact ? .imageOnly : .imageLeading
+        }
+    }
+
     /// The button with this title (for tests and the self-test).
     func button(titled title: String) -> NSButton? {
         subviews.flatMap(\.subviews).compactMap { $0 as? NSButton }.first { $0.title == title }

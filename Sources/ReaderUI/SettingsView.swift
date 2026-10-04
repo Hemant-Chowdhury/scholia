@@ -54,7 +54,7 @@ struct PromptSettings: View {
     var body: some View {
         Form {
             Section {
-                Text("The assistant also receives the book context: the location, the text around the selection, related passages and earlier questions. These texts tell it what to do with that context.")
+                Text("The assistant also receives the book context: the location, the text around the selection, related passages and earlier questions. These texts tell it what to do with that context. If a field is empty, Reader uses the default text.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             ForEach(fields, id: \.title) { field in

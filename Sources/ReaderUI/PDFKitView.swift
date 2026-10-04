@@ -82,7 +82,7 @@ struct PDFKitView: NSViewRepresentable {
             positionBar(for: model.selection, in: view)
         }
 
-        /// H, E, S, D and A work on the selection in this window when the PDF view or PDFKit's views inside it have the focus.
+        /// H, E, S, D, A and R work on the selection in this window when the PDF view or PDFKit's views inside it have the focus.
         /// Typing in a text field (for example, the search field) is not changed.
         private func startKeyMonitor(for view: PDFView) {
             keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak view] event in
@@ -176,6 +176,11 @@ struct PDFKitView: NSViewRepresentable {
                 return
             }
             (bar as? SelectionBarView)?.setHighlighted(!model.selectionHighlights.isEmpty)
+            if let bar = bar as? SelectionBarView {
+                bar.setCompact(false)
+                bar.layoutSubtreeIfNeeded()
+                if bar.fittingSize.width > container.bounds.width - 8 { bar.setCompact(true) }
+            }
             bar.layoutSubtreeIfNeeded()
             let rect = container.convert(view.convert(selection.bounds(for: page), from: page), from: view)
             let size = bar.fittingSize

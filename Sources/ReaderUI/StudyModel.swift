@@ -51,9 +51,15 @@ public final class StudyModel {
 
     public var count: Int { summaries.count }
 
+    /// The thread that the assistant shows (it can change in the book window).
+    public func follow(_ threadID: String?) {
+        selectedID = threadID
+    }
+
+    /// Opens a thread. While an answer is running, the assistant keeps its thread, and so does the selection.
     public func select(_ threadID: String) {
         guard let summary = summaries.first(where: { $0.id == threadID }) else { return }
-        selectedID = threadID
         reader.assistant.open(thread: summary.thread)
+        selectedID = reader.assistant.currentThread?.id
     }
 }

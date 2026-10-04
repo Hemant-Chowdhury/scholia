@@ -25,11 +25,12 @@ struct StudyWindow: View {
             }
         }
         .frame(minWidth: 800, minHeight: 500)
-        .task(id: workspaceID) { attach() }
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in if study == nil { attach() } }
+        // Follow the open book window of this workspace: a new window gives a new reader, a closed one gives none.
+        .onChange(of: library.readerVersion, initial: true) { attach() }
     }
 
     private func attach() {
-        if study == nil, let reader = library.reader(forWorkspace: workspaceID) { study = StudyModel(reader: reader) }
+        let reader = library.reader(forWorkspace: workspaceID)
+        if reader !== study?.reader { study = reader.map(StudyModel.init(reader:)) }
     }
 }

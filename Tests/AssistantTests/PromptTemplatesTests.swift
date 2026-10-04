@@ -66,6 +66,24 @@ struct PromptTemplatesTests {
         #expect(ContextBuilder.firstPrompt(input(.resources, templates)).hasSuffix("Task: Find two videos."))
         #expect(ReadingAction.resources.title == "Resources")
     }
+    @Test func onlyChangedFieldsAreSaved() throws {
+        let defaults = UserDefaults(suiteName: UUID().uuidString)!
+        var templates = PromptTemplates.standard
+        templates.define = "Define like a glossary."
+        templates.save(to: defaults)
+        let data = try #require(defaults.data(forKey: PromptTemplates.defaultsKey))
+        let saved = try #require(try JSONSerialization.jsonObject(with: data) as? [String: String])
+        #expect(saved == ["define": "Define like a glossary."])
+        #expect(PromptTemplates.load(from: defaults) == templates)
+    }
+
+    @Test func veryLongCustomRulesAreCut() {
+        var templates = PromptTemplates.standard
+        templates.rules = String(repeating: "rule ", count: 3000)
+        let prompt = ContextBuilder.firstPrompt(input(.explain, templates))
+        #expect(prompt.count < 4000 + 2000)
+    }
+
 }
 
 @MainActor

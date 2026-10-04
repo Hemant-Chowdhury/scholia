@@ -19,7 +19,7 @@ public struct StudyView: View {
         NavigationSplitView {
             List(selection: Binding(get: { study.selectedID }, set: { if let id = $0 { study.select(id) } })) {
                 if study.count == 0 {
-                    Text("No questions yet. In the book window, select text and press E (Explain), S, D or A.")
+                    Text("No questions yet. In the book window, select text and press E (Explain), S, D, A or R.")
                         .foregroundStyle(.secondary)
                 }
                 ForEach(study.sections) { section in
@@ -40,17 +40,16 @@ public struct StudyView: View {
         }
         .navigationTitle("Study: \(reader.workspace.document.title)")
         .onChange(of: assistant.allThreads.map(\.updatedAt)) { study.reload() }
+        .onChange(of: assistant.currentThread?.id) { study.follow(assistant.currentThread?.id) }
     }
 
     private func detail(_ thread: ThreadRecord) -> some View {
         VStack(spacing: 0) {
-            ScrollView {
-                ThreadView(reader: reader, thread: thread)
-                    .font(.system(size: 15))
-                    .lineSpacing(3)
-                    .frame(maxWidth: 780)
-                    .frame(maxWidth: .infinity)
-            }
+            ThreadView(reader: reader, thread: thread)
+                .font(.system(size: 15))
+                .lineSpacing(3)
+                .frame(maxWidth: 780)
+                .frame(maxWidth: .infinity)
             Divider()
             HStack(spacing: 8) {
                 TextField("Ask a follow-up…", text: $draft, axis: .vertical)
@@ -71,8 +70,8 @@ public struct StudyView: View {
         .toolbar {
             ToolbarItem {
                 Button {
-                    reader.open(thread)
                     openWindow(id: "reader", value: reader.pdfURL)
+                    reader.open(thread)
                 } label: { Label("Show in PDF", systemImage: "doc.text.magnifyingglass") }
                     .help("Show this text in the book window")
             }

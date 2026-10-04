@@ -35,7 +35,7 @@ In scope:
 
 Out of scope for version 1 (planned for later versions):
 
-- Find resources (YouTube videos and blogs). Planned for version 1.1.
+- Find resources (YouTube videos and blogs). Moved into version 1 on 2026-10-04, as an action on the selection (R).
 - Glossary and chapter brief.
 - Excalidraw canvas window for diagrams.
 - Markdown and code workspaces (an IDE-like mode).
@@ -260,8 +260,10 @@ The app shows the models that the agent reports for the session. If the agent do
 The agents are coding agents. They can edit files and run commands. The app uses three layers of protection:
 
 1. **Client capabilities.** The app does not offer file write or terminal capabilities to the agent.
-2. **Permission requests.** The app answers automatically. It allows read, search, web search, and web fetch. It refuses edit, write, and shell commands. The app does not show a dialog.
-3. **Agent configuration.** The workspace folder contains an `opencode.json` that denies `edit` and `bash`. The Claude Code adapter starts with these tools disallowed. Other agents use their equivalent settings where they have them.
+2. **Permission requests.** The app refuses every permission request automatically. It does not show a dialog.
+3. **Agent configuration** (changed after live probes on 2026-10-04: the user's own Claude Code settings let shell commands run with no permission request):
+   - Claude Code (adapter version pinned): only the Read, Glob, Grep and WebSearch tools; no MCP servers; the user's settings are not loaded; default permission mode. Thus a read outside the workspace folder needs a permission request, which the app refuses. Only WebSearch is approved in advance (`allowedTools`), for Find resources. WebFetch is not available.
+   - OpenCode: its read-only "plan" mode. OpenCode's free tier refuses a changed tool set, so the app does not use an `opencode.json`. The app checks that the agent reply shows the mode; if not, it does not use the session.
 
 ### 6.6 Processes
 
@@ -355,5 +357,5 @@ Each milestone gives a version that the user can use.
 
 After version 1:
 
-- Version 1.1: Find resources (YouTube videos and blogs, grouped and cached for each chapter).
+- Version 1.1: a chapter brief with resources, grouped and cached for each chapter.
 - Later: glossary, chapter brief, Excalidraw canvas window, and Markdown and code workspaces.

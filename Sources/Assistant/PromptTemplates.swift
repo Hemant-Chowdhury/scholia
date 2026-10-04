@@ -81,8 +81,27 @@ public struct PromptTemplates: Sendable, Equatable, Codable {
         return templates
     }
 
+    /// Saves only the fields that differ from the defaults, so a later improvement of a default text
+    /// reaches the reader for each field that the reader did not change.
     public func save(to defaults: UserDefaults) {
         if let data = try? JSONEncoder().encode(self) { defaults.set(data, forKey: Self.defaultsKey) }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        let standard = Self.standard
+        for (key, path) in Self.fields where self[keyPath: path] != standard[keyPath: path] {
+            try container.encode(self[keyPath: path], forKey: key)
+        }
+    }
+
+    private static var fields: [(CodingKeys, KeyPath<PromptTemplates, String>)] { [
+        (.rules, \.rules), (.explain, \.explain), (.simplify, \.simplify), (.define, \.define), (.ask, \.ask),
+        (.simpler, \.simpler), (.example, \.example), (.why, \.why), (.connect, \.connect), (.resources, \.resources),
+    ] }
+
+    enum CodingKeys: String, CodingKey {
+        case rules, explain, simplify, define, ask, simpler, example, why, connect, resources
     }
 
     /// A field, or its default when the field is empty.

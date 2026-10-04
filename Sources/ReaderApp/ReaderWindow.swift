@@ -27,6 +27,7 @@ struct ReaderWindow: View {
             dismissWindow(id: "library")
         }
         .onDisappear {
+            if let model { library.readerClosed(model) }
             if library.readerWindowClosed() { openWindow(id: "library") }
         }
         .task(id: url) {
