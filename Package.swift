@@ -12,6 +12,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "DocumentKit"),
+        .target(name: "AgentKit"),
         .target(name: "WorkspaceStore", dependencies: [
             "DocumentKit",
             .product(name: "GRDB", package: "GRDB.swift"),
@@ -19,6 +20,7 @@ let package = Package(
         .target(name: "ReaderUI", dependencies: ["DocumentKit", "WorkspaceStore"]),
         .executableTarget(name: "ReaderApp", dependencies: ["ReaderUI", "WorkspaceStore"]),
         .target(name: "TestSupport", path: "Tests/TestSupport"),
+        .testTarget(name: "AgentKitTests", dependencies: ["AgentKit"]),
         .testTarget(name: "DocumentKitTests", dependencies: ["DocumentKit", "TestSupport"]),
         .testTarget(name: "WorkspaceStoreTests", dependencies: ["WorkspaceStore", "DocumentKit", "TestSupport"]),
         .testTarget(name: "ReaderUITests", dependencies: ["ReaderUI", "WorkspaceStore", "DocumentKit", "TestSupport"]),
