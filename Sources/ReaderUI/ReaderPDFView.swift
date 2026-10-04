@@ -37,6 +37,9 @@ final class ReaderPDFView: PDFView {
 
     override var acceptsFirstResponder: Bool { true }
 
+    /// The first click in an inactive window also selects (an Option-click must not be lost).
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     /// The plain H key, with no Command, Control or Option.
     static func isHighlightKey(_ event: NSEvent) -> Bool {
         event.modifierFlags.intersection([.command, .control, .option]).isEmpty
