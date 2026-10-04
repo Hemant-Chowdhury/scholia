@@ -31,6 +31,18 @@ struct ReaderWindowUITests {
         return Hosted(window: window, pdfView: pdfView, model: model)
     }
 
+    /// Dispatches the event like AppKit does: `NSApp.sendEvent` finds the window, the window hit-tests the
+    /// views. Only the app's event loop sets `NSApp.currentEvent`, so the test gives the event to the view.
+    func deliver(_ event: NSEvent) {
+        ReaderPDFView.currentEvent = { event }
+        defer { ReaderPDFView.currentEvent = { NSApp.currentEvent } }
+        if event.type == .keyDown {
+            event.window?.sendEvent(event)
+        } else {
+            NSApp.sendEvent(event)
+        }
+    }
+
     func spin(_ seconds: TimeInterval) {
         RunLoop.main.run(until: Date().addingTimeInterval(seconds))
     }
@@ -57,17 +69,18 @@ struct ReaderWindowUITests {
         spin(0.2)
         let windowPoint = hosted.pdfView.convert(hosted.pdfView.convert(pagePoint, from: page), to: nil)
         let event = try #require(NSEvent.mouseEvent(
-            with: .leftMouseDown, location: windowPoint, modifierFlags: modifiers, timestamp: 0,
+            with: .leftMouseDown, location: windowPoint, modifierFlags: modifiers, timestamp: ProcessInfo.processInfo.systemUptime,
             windowNumber: hosted.window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
-        hosted.pdfView.mouseDown(with: event)
+        deliver(event)
         spin(0.3)
     }
 
     func press(_ hosted: Hosted, key: String) throws {
         let event = try #require(NSEvent.keyEvent(
-            with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: hosted.window.windowNumber,
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: hosted.window.windowNumber,
             context: nil, characters: key, charactersIgnoringModifiers: key, isARepeat: false, keyCode: 4))
-        hosted.pdfView.keyDown(with: event)
+        deliver(event)
         spin(0.3)
     }
 
@@ -112,4 +125,37 @@ struct ReaderWindowUITests {
         #expect(page.annotations.contains { $0.type == "Highlight" })
     }
 
+
+    @Test func hKeyAfterClickingTheSidebarStillHighlights() throws {
+        let url = try helper.makeBook()
+        let hosted = try host(url)
+        hosted.window.makeFirstResponder(nil)
+        try click(hosted, pageIndex: 0, pagePoint: helper.center(of: 0, onPage: 0, in: url), modifiers: .option)
+        try press(hosted, key: "h")
+        #expect(hosted.model.highlights.count == 1)
+    }
+
+    @Test func aClickOnTheBarReachesTheBarNotThePDFView() throws {
+        let url = try helper.makeBook()
+        let hosted = try host(url)
+        try click(hosted, pageIndex: 0, pagePoint: helper.center(of: 0, onPage: 0, in: url), modifiers: .option)
+        let content = try #require(hosted.window.contentView)
+        let bar = try #require(Self.selectionBar(in: content))
+        let center = bar.convert(CGPoint(x: bar.bounds.midX, y: bar.bounds.midY), to: nil)
+        // hitTest takes a point in the superview's coordinates; the window's frame view uses window coordinates.
+        let frameView = try #require(content.superview)
+        let hit = try #require(frameView.hitTest(frameView.convert(center, from: nil)))
+        #expect(hit === bar || hit.isDescendant(of: bar), "click goes to \(type(of: hit))")
+    }
+
+    @Test func highlightKeyDecisionIgnoresModifiedKeys() throws {
+        func key(_ chars: String, _ flags: NSEvent.ModifierFlags) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0,
+                                          context: nil, characters: chars, charactersIgnoringModifiers: chars,
+                                          isARepeat: false, keyCode: 4))
+        }
+        #expect(ReaderPDFView.isHighlightKey(try key("h", [])))
+        #expect(!ReaderPDFView.isHighlightKey(try key("h", .command)))
+        #expect(!ReaderPDFView.isHighlightKey(try key("j", [])))
+    }
 }

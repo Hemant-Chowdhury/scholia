@@ -23,6 +23,10 @@ struct PDFKitView: NSViewRepresentable {
         return view
     }
 
+    static func dismantleNSView(_ view: ReaderPDFView, coordinator: Coordinator) {
+        coordinator.stopKeyMonitor()
+    }
+
     func updateNSView(_ view: ReaderPDFView, context: Context) {
         let coordinator = context.coordinator
         coordinator.apply(model.navigationRequest, to: view)
@@ -39,6 +43,7 @@ struct PDFKitView: NSViewRepresentable {
         private var applyingSelection = false
         private var drawn: [String: [PDFAnnotation]] = [:]
         private lazy var bar = NSHostingView(rootView: SelectionBar(model: model))
+        private var keyMonitor: Any?
 
         init(model: ReaderModel) {
             self.model = model
@@ -49,6 +54,40 @@ struct PDFKitView: NSViewRepresentable {
             center.addObserver(self, selector: #selector(pageChanged(_:)), name: .PDFViewPageChanged, object: view)
             center.addObserver(self, selector: #selector(selectionChanged(_:)), name: .PDFViewSelectionChanged, object: view)
             center.addObserver(self, selector: #selector(layoutChanged(_:)), name: .PDFViewScaleChanged, object: view)
+            startKeyMonitor(for: view)
+            if let clip = view.documentView?.enclosingScrollView?.contentView {
+                clip.postsBoundsChangedNotifications = true
+                center.addObserver(self, selector: #selector(scrolled(_:)), name: NSView.boundsDidChangeNotification, object: clip)
+                scrollTarget = view
+            }
+        }
+
+        private weak var scrollTarget: PDFView?
+
+        @objc private func scrolled(_ notification: Notification) {
+            guard let view = scrollTarget else { return }
+            positionBar(for: model.selection, in: view)
+        }
+
+        /// H highlights the selection in this window, also when PDFKit's internal views have the focus.
+        /// Typing in a text field (for example, the search field) is not changed.
+        private func startKeyMonitor(for view: PDFView) {
+            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak view] event in
+                guard ReaderPDFView.isHighlightKey(event) else { return event }
+                let eventWindow = event.window
+                let handled = MainActor.assumeIsolated { () -> Bool in
+                    guard let self, let view, eventWindow === view.window,
+                          !(view.window?.firstResponder is NSText), self.model.selection != nil else { return false }
+                    self.model.highlightSelection()
+                    return true
+                }
+                return handled ? nil : event
+            }
+        }
+
+        func stopKeyMonitor() {
+            if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+            keyMonitor = nil
         }
 
         @objc private func pageChanged(_ notification: Notification) {
@@ -113,19 +152,24 @@ struct PDFKitView: NSViewRepresentable {
             }
         }
 
-        /// Puts the bar above the first line of the selection, in the scrolling document view.
+        /// Puts the bar above the first line of the selection. The bar is a subview of the PDF view itself
+        /// (PDFKit's page views would cover it in the document view), so it moves again when the view scrolls.
         func positionBar(for selection: PDFSelection?, in view: PDFView) {
-            guard let selection, let page = selection.pages.first, let documentView = view.documentView else {
+            guard let selection, let page = selection.pages.first else {
                 bar.isHidden = true
                 return
             }
-            if bar.superview !== documentView { documentView.addSubview(bar) }
-            let inView = view.convert(selection.bounds(for: page), from: page)
-            let inDocument = documentView.convert(inView, from: view)
+            if bar.superview !== view {
+                view.addSubview(bar)
+                (view as? ReaderPDFView)?.selectionBar = bar
+            }
+            let rect = view.convert(selection.bounds(for: page), from: page)
             let size = bar.fittingSize
-            let y = documentView.isFlipped ? inDocument.minY - size.height - 6 : inDocument.maxY + 6
-            bar.frame = CGRect(x: max(inDocument.minX, 4), y: max(y, 4), width: size.width, height: size.height)
-            bar.isHidden = false
+            let y = view.isFlipped ? rect.minY - size.height - 6 : rect.maxY + 6
+            let maxY = view.bounds.height - size.height - 4
+            bar.frame = CGRect(x: min(max(rect.minX, 4), max(view.bounds.width - size.width - 4, 4)),
+                               y: min(max(y, 4), max(maxY, 4)), width: size.width, height: size.height)
+            bar.isHidden = !view.bounds.intersects(rect)
         }
     }
 }
