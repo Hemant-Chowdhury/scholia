@@ -22,12 +22,13 @@ extension WorkspaceDatabase {
         }
     }
 
-    /// Removes the highlight, and its anchor when no other highlight uses the anchor.
+    /// Removes the highlight, and its anchor when no other highlight and no thread uses the anchor.
     public func removeHighlight(id: String) throws {
         try queue.write { db in
             guard let highlight = try HighlightRecord.fetchOne(db, key: id) else { return }
             try highlight.delete(db)
             let anchorInUse = try HighlightRecord.filter(Column("anchor_id") == highlight.anchorID).fetchCount(db) > 0
+                || ThreadRecord.filter(Column("anchor_id") == highlight.anchorID).fetchCount(db) > 0
             if !anchorInUse {
                 try AnchorRecord.deleteOne(db, key: highlight.anchorID)
             }

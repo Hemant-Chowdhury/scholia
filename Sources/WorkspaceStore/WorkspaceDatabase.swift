@@ -68,6 +68,34 @@ public final class WorkspaceDatabase: Sendable {
                 CREATE INDEX highlight_anchor ON highlight(anchor_id);
                 """)
         }
+        migrator.registerMigration("v3-thread") { db in
+            try db.execute(sql: """
+                CREATE TABLE thread (
+                    id TEXT PRIMARY KEY,
+                    document_id TEXT NOT NULL REFERENCES document(id) ON DELETE CASCADE,
+                    anchor_id TEXT REFERENCES anchor(id) ON DELETE SET NULL,
+                    title TEXT NOT NULL,
+                    first_page INTEGER NOT NULL,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    agent_id TEXT,
+                    model_id TEXT
+                );
+                CREATE INDEX thread_document_page ON thread(document_id, first_page);
+                CREATE TABLE message (
+                    id TEXT PRIMARY KEY,
+                    thread_id TEXT NOT NULL REFERENCES thread(id) ON DELETE CASCADE,
+                    role TEXT NOT NULL,
+                    action TEXT,
+                    content TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    error TEXT,
+                    created_at DATETIME NOT NULL
+                );
+                CREATE INDEX message_thread ON message(thread_id, created_at);
+                CREATE VIRTUAL TABLE thread_text USING fts5(thread_id UNINDEXED, text, tokenize = 'porter unicode61');
+                """)
+        }
         return migrator
     }
 
