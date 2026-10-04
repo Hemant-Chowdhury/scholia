@@ -8,6 +8,8 @@ final class FakeTransport: LineTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var _sent: [String] = []
     private var waiters: [(Int, CheckedContinuation<Void, Never>)] = []
+    /// Answers each message that the client sends, like a scripted agent. Returns the lines to send back.
+    var responder: (@Sendable (JSONValue) -> [String])?
 
     init() {
         (lines, input) = AsyncStream.makeStream(of: String.self)
@@ -26,6 +28,9 @@ final class FakeTransport: LineTransport, @unchecked Sendable {
             return done
         }
         ready.forEach { $0.resume() }
+        if let responder, let message = JSONRPCConnection.parseLine(line) {
+            responder(message).forEach { push($0) }
+        }
     }
 
     func close() async { input.finish() }
