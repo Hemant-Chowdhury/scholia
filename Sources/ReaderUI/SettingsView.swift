@@ -44,6 +44,7 @@ struct PromptSettings: View {
         ("Simplify (S)", "The task for Simplify.", \.simplify),
         ("Define (D)", "The task for Define.", \.define),
         ("Ask (A)", "Comes before your own question.", \.ask),
+        ("Find resources (R)", "The agent searches the web for videos and articles.", \.resources),
         ("Quick follow-up: Simpler", "", \.simpler),
         ("Quick follow-up: Give an example", "", \.example),
         ("Quick follow-up: Why does this matter?", "", \.why),

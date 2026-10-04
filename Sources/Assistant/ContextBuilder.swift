@@ -2,7 +2,7 @@ import DocumentKit
 import Foundation
 
 public enum ReadingAction: String, Sendable, CaseIterable {
-    case explain, simplify, define, ask, followup
+    case explain, simplify, define, ask, followup, resources
 
     public var title: String {
         switch self {
@@ -11,6 +11,7 @@ public enum ReadingAction: String, Sendable, CaseIterable {
         case .define: "Define"
         case .ask: "Ask"
         case .followup: "Follow-up"
+        case .resources: "Resources"
         }
     }
 }
@@ -123,6 +124,7 @@ public enum ContextBuilder {
         case .explain: templates.resolved(\.explain)
         case .simplify: templates.resolved(\.simplify)
         case .define: templates.resolved(\.define)
+        case .resources: templates.resolved(\.resources)
         case .ask, .followup: templates.resolved(\.ask) + " " + (question ?? "")
         }
     }

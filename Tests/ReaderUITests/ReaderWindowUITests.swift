@@ -176,6 +176,8 @@ struct ReaderWindowUITests {
         }
         #expect(ReaderPDFView.readerKey(try key("h", [])) == .highlight)
         #expect(ReaderPDFView.readerKey(try key("E", [])) == .explain)
+        #expect(ReaderPDFView.readerKey(try key("r", [])) == .resources)
+        #expect(ReaderKey.resources.action == .resources)
         #expect(ReaderPDFView.readerKey(try key("h", .command)) == nil)
         #expect(ReaderPDFView.readerKey(try key("j", [])) == nil)
     }

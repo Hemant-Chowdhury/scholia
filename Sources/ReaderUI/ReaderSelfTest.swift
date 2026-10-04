@@ -46,8 +46,10 @@ public enum ReaderSelfTest {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             MainActor.assumeIsolated {
                 let selected = view.currentSelection?.string ?? ""
-                if ProcessInfo.processInfo.environment["READER_SELF_TEST_ACTION"] == "explain" {
-                    clickExplain(view: view, window: window, folder: folder, selected: selected, pageIndex: pageIndex)
+                let action = ProcessInfo.processInfo.environment["READER_SELF_TEST_ACTION"]
+                if action == "explain" || action == "resources" {
+                    clickBarButton(action == "explain" ? "Explain" : "Resources", view: view, window: window, folder: folder,
+                                   selected: selected, pageIndex: pageIndex)
                 } else {
                     pressHighlight(window: window, page: page, folder: folder, selected: selected, target: target.text, pageIndex: pageIndex)
                 }
@@ -75,12 +77,14 @@ public enum ReaderSelfTest {
         }
     }
 
-    /// Clicks the Explain button of the selection bar with real mouse events, then waits for the agent's answer.
-    private static func clickExplain(view: ReaderPDFView, window: NSWindow, folder: URL, selected: String, pageIndex: Int) {
-        guard let bar = (view.superview as? ReaderContainerView)?.bar, !bar.isHidden else {
-            return finish(folder, "FAIL: no selection bar; selected: \(selected)")
+    /// Clicks a button of the selection bar with real mouse events, then waits for the agent's answer.
+    private static func clickBarButton(_ title: String, view: ReaderPDFView, window: NSWindow, folder: URL,
+                                       selected: String, pageIndex: Int) {
+        guard let bar = (view.superview as? ReaderContainerView)?.bar as? SelectionBarView, !bar.isHidden,
+              let button = bar.button(titled: title) else {
+            return finish(folder, "FAIL: no selection bar or no \(title) button; selected: \(selected)")
         }
-        let point = bar.convert(CGPoint(x: 30, y: bar.bounds.midY), to: nil)
+        let point = button.convert(CGPoint(x: button.bounds.midX, y: button.bounds.midY), to: nil)
         let frameView = window.contentView?.superview
         let hit = frameView?.hitTest(frameView!.convert(point, from: nil))
         let debug = "click: \(point); hit: \(String(describing: hit.map { type(of: $0) }))\n"

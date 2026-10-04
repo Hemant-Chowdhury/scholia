@@ -55,6 +55,17 @@ struct PromptTemplatesTests {
         #expect(templates.text(for: .simpler) == "Simpler, please.")
         #expect(PromptTemplates.standard.text(for: .why) == QuickFollowUp.why.prompt)
     }
+    @Test func findResourcesAsksForVideosArticlesAndBasicsWithLinksFromWebSearch() {
+        let prompt = ContextBuilder.firstPrompt(input(.resources, .standard))
+        #expect(prompt.contains("Task: Find learning resources for the topic of the selected text"))
+        #expect(prompt.contains("## Watch"))
+        #expect(prompt.contains("## Read"))
+        #expect(prompt.contains("Use web search"))
+        var templates = PromptTemplates.standard
+        templates.resources = "Find two videos."
+        #expect(ContextBuilder.firstPrompt(input(.resources, templates)).hasSuffix("Task: Find two videos."))
+        #expect(ReadingAction.resources.title == "Resources")
+    }
 }
 
 @MainActor
@@ -83,4 +94,5 @@ struct SavedTemplatesTests {
         #expect(backend.prompts.last == "Shorter.")
         #expect(model.messages[2].text == "Simpler")
     }
+
 }

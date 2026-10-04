@@ -76,4 +76,18 @@ struct AssistantUITests {
         #expect(hosted.model.assistant.messages.isEmpty)
     }
 
+
+    @Test func resourcesButtonFindsResourcesForTheSelection() async throws {
+        let backend = FakeBackend()
+        backend.scripts = [.events([.text("## Watch\n- [BPE explained](https://www.youtube.com/watch?v=x)"), .done(stopReason: "end_turn")])]
+        let (hosted, url) = try hostWithAgent(backend)
+        try ui.click(hosted, pageIndex: 0, pagePoint: ui.helper.center(of: 0, onPage: 0, in: url), modifiers: .option)
+        try await ui.settle()
+        let bar = try #require(ReaderWindowUITests.selectionBar(in: hosted.window.contentView!) as? SelectionBarView)
+        let button = try #require(bar.button(titled: "Resources"))
+        button.performClick(nil)
+        try await waitFor { hosted.model.assistant.messages.last?.status == "complete" }
+        #expect(hosted.model.assistant.messages.first?.text == "Resources")
+        #expect(backend.prompts.first?.contains("Task: Find learning resources") == true)
+    }
 }

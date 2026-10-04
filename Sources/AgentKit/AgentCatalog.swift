@@ -42,6 +42,8 @@ public enum AgentCatalog {
             "strictMcpConfig": .bool(true),
             "settingSources": .array([]),
             "permissionMode": .string("default"),
+            // Web search runs with no request (Find resources needs it); everything else still asks.
+            "allowedTools": .array([.string("WebSearch")]),
             "disallowedTools": .array(["Bash", "Edit", "Write", "MultiEdit", "NotebookEdit", "Agent", "Task", "WebFetch"]
                 .map(JSONValue.string)),
         ])])]),

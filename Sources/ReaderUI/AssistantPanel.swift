@@ -76,7 +76,7 @@ struct AssistantPanel: View {
                     .onSubmit(send)
                     .disabled(assistant.isRunning)
             } else {
-                Text("Select text, then press E (Explain), S, D or A.").font(.callout).foregroundStyle(.secondary)
+                Text("Select text, then press E (Explain), S, D, A or R (Resources).").font(.callout).foregroundStyle(.secondary)
                 Spacer()
             }
             if assistant.isRunning {
@@ -198,7 +198,7 @@ struct ThreadListView: View {
             if assistant.allThreads.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Ask about any part of the book").font(.headline)
-                    Text("Option-click a paragraph to select it, or drag to select text. Then press E to explain it, S to simplify it, D to define its terms, or A to ask your own question.")
+                    Text("Option-click a paragraph to select it, or drag to select text. Then press E to explain it, S to simplify it, D to define its terms, A to ask your own question, or R to find videos and articles about it.")
                         .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 6)

@@ -15,6 +15,7 @@ public struct PromptTemplates: Sendable, Equatable, Codable {
     public var example: String
     public var why: String
     public var connect: String
+    public var resources: String
 
     public static let standard = PromptTemplates(
         rules: """
@@ -34,10 +35,21 @@ public struct PromptTemplates: Sendable, Equatable, Codable {
         simpler: QuickFollowUp.simpler.prompt,
         example: QuickFollowUp.example.prompt,
         why: QuickFollowUp.why.prompt,
-        connect: QuickFollowUp.connect.prompt)
+        connect: QuickFollowUp.connect.prompt,
+        resources: """
+            Find learning resources for the topic of the selected text, so that I can understand it better. Use web search, and give only links that you found with it. Use these sections:
+            ## Watch
+            3 to 5 good YouTube videos.
+            ## Read
+            3 to 5 good articles, blog posts or tutorials.
+            ## Read first
+            The basics that I should know first: earlier parts of this book (with pages) or outside topics.
+            For each resource: a Markdown link with its real title, then one short line that tells why it helps and its level (beginner, intermediate or advanced). Prefer well-known, recent sources.
+            """)
 
     public init(rules: String, explain: String, simplify: String, define: String, ask: String,
-                simpler: String, example: String, why: String, connect: String) {
+                simpler: String, example: String, why: String, connect: String, resources: String) {
+        self.resources = resources
         self.rules = rules
         self.explain = explain
         self.simplify = simplify
@@ -60,7 +72,7 @@ public struct PromptTemplates: Sendable, Equatable, Codable {
                   simplify: value(.simplify, standard.simplify), define: value(.define, standard.define),
                   ask: value(.ask, standard.ask), simpler: value(.simpler, standard.simpler),
                   example: value(.example, standard.example), why: value(.why, standard.why),
-                  connect: value(.connect, standard.connect))
+                  connect: value(.connect, standard.connect), resources: value(.resources, standard.resources))
     }
 
     public static func load(from defaults: UserDefaults) -> PromptTemplates {

@@ -1,7 +1,7 @@
 import AppKit
 import Assistant
 
-/// The small bar above the selection, with native buttons: Explain, Simplify, Define, Ask… and Highlight.
+/// The small bar above the selection, with native buttons: Explain, Simplify, Define, Ask…, Resources and Highlight.
 /// It is an AppKit view (not SwiftUI): it lives next to the PDF view, and NSButton handles real clicks there.
 final class SelectionBarView: NSVisualEffectView {
     enum Action: Equatable {
@@ -29,6 +29,7 @@ final class SelectionBarView: NSVisualEffectView {
             button("Simplify", symbol: "text.badge.minus", key: "S", action: .reading(.simplify)),
             button("Define", symbol: "character.book.closed", key: "D", action: .reading(.define)),
             button("Ask…", symbol: "questionmark.bubble", key: "A", action: .reading(.ask)),
+            button("Resources", symbol: "globe", key: "R", action: .reading(.resources)),
         ]
         configure(highlightButton, title: "Highlight", symbol: "highlighter", help: "Highlight (H)")
         highlightButton.target = self

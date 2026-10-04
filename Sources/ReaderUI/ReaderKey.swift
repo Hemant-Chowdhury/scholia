@@ -2,7 +2,7 @@ import Assistant
 
 /// The one-letter keys that work on the selection in the PDF view.
 enum ReaderKey: String {
-    case highlight = "h", explain = "e", simplify = "s", define = "d", ask = "a"
+    case highlight = "h", explain = "e", simplify = "s", define = "d", ask = "a", resources = "r"
 
     var action: ReadingAction? {
         switch self {
@@ -11,6 +11,7 @@ enum ReaderKey: String {
         case .simplify: .simplify
         case .define: .define
         case .ask: .ask
+        case .resources: .resources
         }
     }
 }

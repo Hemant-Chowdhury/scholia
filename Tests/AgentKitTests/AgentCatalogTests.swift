@@ -58,6 +58,9 @@ struct AgentCatalogTests {
         #expect(options["settingSources"] == .array([]))
         #expect(options["permissionMode"] == .string("default"))
         #expect(options["disallowedTools"]?.arrayValue?.contains(.string("WebFetch")) == true)
+        // Only web search is approved in advance (Find resources needs it). Read is not: a read outside the
+        // workspace must still ask, and Reader refuses.
+        #expect(options["allowedTools"] == .array([.string("WebSearch")]))
         #expect(AgentCatalog.claude.command.last == "@agentclientprotocol/claude-agent-acp@0.85.1")
         #expect(AgentCatalog.opencode.sessionSettings == [AgentSpec.Setting(configID: "mode", value: "plan")])
     }
