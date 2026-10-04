@@ -9,6 +9,7 @@ import WorkspaceStore
 
 /// The assistant in the real reader window, driven by real events, with a scripted agent.
 @MainActor
+@Suite(.enabled(if: WindowTests.available))
 struct AssistantUITests {
     let ui = ReaderWindowUITests()
 

@@ -81,7 +81,8 @@ struct StudyModelTests {
         #expect(study.sections.flatMap(\.items).count == 3)
     }
 
-    @Test func studyWindowShowsTheListAndTheSelectedConversation() async throws {
+    @Test(.enabled(if: WindowTests.available))
+    func studyWindowShowsTheListAndTheSelectedConversation() async throws {
         let (reader, _) = try await readerWithThreads()
         let study = StudyModel(reader: reader)
         study.select(try #require(study.sections.first?.items.first).id)

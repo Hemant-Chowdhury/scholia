@@ -4,11 +4,13 @@ import Foundation
 import PDFKit
 import SwiftUI
 import Testing
+import TestSupport
 @testable import ReaderUI
 
 /// UI tests with the real reader views in a real window, driven by real mouse and key events.
 /// Set READER_UI_SNAPSHOT_DIR to save a picture of the window after each test.
 @MainActor
+@Suite(.enabled(if: WindowTests.available))
 struct ReaderWindowUITests {
     let helper = ParagraphSelectionTests()
 

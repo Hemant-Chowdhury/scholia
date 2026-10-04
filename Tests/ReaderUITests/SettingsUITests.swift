@@ -2,9 +2,11 @@ import AppKit
 import Assistant
 import SwiftUI
 import Testing
+import TestSupport
 @testable import ReaderUI
 
 @MainActor
+@Suite(.enabled(if: WindowTests.available))
 struct SettingsUITests {
     @Test func promptSettingsShowEachPromptInAWindow() throws {
         _ = NSApplication.shared

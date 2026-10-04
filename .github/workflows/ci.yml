@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show the Swift version
+        run: swift --version
+      - name: Build
+        run: swift build
+      - name: Test
+        # Window tests are skipped on CI (CI=true). Live agent tests run only with READER_LIVE_AGENT.
+        run: swift test

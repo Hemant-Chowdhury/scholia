@@ -1,0 +1,25 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: swift test
+      - name: Build the app and the disk image
+        run: VERSION="${GITHUB_REF_NAME#v}" scripts/make-dmg.sh
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" build/Reader.dmg \
+            --title "Reader $GITHUB_REF_NAME" \
+            --notes "Download Reader.dmg, open it, and drag Reader to Applications. The app is not notarized: the first time, right-click Reader and select Open. See the README for details."
