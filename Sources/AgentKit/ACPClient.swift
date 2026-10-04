@@ -17,6 +17,13 @@ public struct ACPConfigOption: Sendable, Equatable {
     public let currentValue: String?
     public let choices: [ACPChoice]
 
+    public init(id: String, name: String, currentValue: String?, choices: [ACPChoice]) {
+        self.id = id
+        self.name = name
+        self.currentValue = currentValue
+        self.choices = choices
+    }
+
     static func parseAll(_ value: JSONValue?) -> [ACPConfigOption] {
         (value?.arrayValue ?? []).compactMap { option in
             guard let id = option["id"]?.stringValue else { return nil }

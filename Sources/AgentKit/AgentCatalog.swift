@@ -70,6 +70,12 @@ public struct AgentAvailability: Sendable, Equatable {
     public let status: AgentStatus
     /// The program to start (the first word of the command), when it is installed.
     public let executable: URL?
+
+    public init(spec: AgentSpec, status: AgentStatus, executable: URL?) {
+        self.spec = spec
+        self.status = status
+        self.executable = executable
+    }
 }
 
 public enum AgentError: Error, Equatable, LocalizedError {
