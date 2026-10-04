@@ -6,8 +6,6 @@ final class ReaderPDFView: PDFView {
     var onOptionClick: ((Int, CGPoint) -> Bool)?
     /// Handles a reading key (H, E, S, D or A). Returns true when it used the key.
     var onKey: ((ReaderKey) -> Bool)?
-    /// Clicks on the selection bar must reach the bar.
-    weak var selectionBar: NSView?
     /// The event that AppKit is dispatching. Tests replace it, because only the app's own event loop sets
     /// `NSApp.currentEvent`.
     static var currentEvent: () -> NSEvent? = { NSApp.currentEvent }
@@ -16,9 +14,8 @@ final class ReaderPDFView: PDFView {
     /// this view takes the click itself, so `mouseDown` can select the paragraph.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let hit = super.hitTest(point)
-        guard let hit, let event = Self.currentEvent(), event.type == .leftMouseDown,
+        guard hit != nil, let event = Self.currentEvent(), event.type == .leftMouseDown,
               event.modifierFlags.contains(.option) else { return hit }
-        if let bar = selectionBar, hit === bar || hit.isDescendant(of: bar) { return hit }
         return self
     }
 

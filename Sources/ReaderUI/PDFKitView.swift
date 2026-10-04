@@ -10,28 +10,39 @@ struct PDFKitView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(model: model) }
 
-    func makeNSView(context: Context) -> ReaderPDFView {
-        let view = ReaderPDFView()
+    func makeNSView(context: Context) -> ReaderContainerView {
+        let bar = SelectionBarView()
+        let model = self.model
+        bar.onAction = { action in
+            switch action {
+            case .reading(let reading): model.run(reading)
+            case .highlight: model.highlightSelection()
+            case .removeHighlight: model.removeSelectionHighlights()
+            }
+        }
+        let container = ReaderContainerView(bar: bar)
+        let view = container.pdfView
         view.autoScales = true
         view.displayMode = .singlePageContinuous
         view.displaysPageBreaks = true
         view.document = model.pdf
-        let model = self.model
         view.onOptionClick = { pageIndex, point in model.optionClick(at: point, onPage: pageIndex) }
         view.onKey = { key in model.handle(key) }
-        context.coordinator.observe(view)
-        return view
+        context.coordinator.observe(view, bar: container.bar)
+        return container
     }
 
-    static func dismantleNSView(_ view: ReaderPDFView, coordinator: Coordinator) {
+    static func dismantleNSView(_ view: ReaderContainerView, coordinator: Coordinator) {
         coordinator.stopKeyMonitor()
     }
 
-    func updateNSView(_ view: ReaderPDFView, context: Context) {
+    func updateNSView(_ container: ReaderContainerView, context: Context) {
+        let view = container.pdfView
         let coordinator = context.coordinator
         coordinator.apply(model.navigationRequest, to: view)
         coordinator.apply(model.selectionRequest, to: view)
         coordinator.sync(model.highlights, in: view)
+        _ = model.highlights.count
         coordinator.positionBar(for: model.selection, in: view)
     }
 
@@ -42,14 +53,16 @@ struct PDFKitView: NSViewRepresentable {
         private var handledSelectionID: UUID?
         private var applyingSelection = false
         private var drawn: [String: [PDFAnnotation]] = [:]
-        private lazy var bar = NSHostingView(rootView: SelectionBar(model: model))
         private var keyMonitor: Any?
 
         init(model: ReaderModel) {
             self.model = model
         }
 
-        func observe(_ view: PDFView) {
+        private weak var bar: NSView?
+
+        func observe(_ view: PDFView, bar: NSView) {
+            self.bar = bar
             let center = NotificationCenter.default
             center.addObserver(self, selector: #selector(pageChanged(_:)), name: .PDFViewPageChanged, object: view)
             center.addObserver(self, selector: #selector(selectionChanged(_:)), name: .PDFViewSelectionChanged, object: view)
@@ -151,24 +164,46 @@ struct PDFKitView: NSViewRepresentable {
             }
         }
 
-        /// Puts the bar above the first line of the selection. The bar is a subview of the PDF view itself
-        /// (PDFKit's page views would cover it in the document view), so it moves again when the view scrolls.
+        /// Puts the bar above the first line of the selection. The bar is a sibling of the PDF view (in the
+        /// container), not a subview: PDFKit's gesture recognizers would take the clicks of a subview.
         func positionBar(for selection: PDFSelection?, in view: PDFView) {
+            guard let bar, let container = bar.superview else { return }
             guard let selection, let page = selection.pages.first else {
                 bar.isHidden = true
                 return
             }
-            if bar.superview !== view {
-                view.addSubview(bar)
-                (view as? ReaderPDFView)?.selectionBar = bar
-            }
-            let rect = view.convert(selection.bounds(for: page), from: page)
+            (bar as? SelectionBarView)?.setHighlighted(!model.selectionHighlights.isEmpty)
+            bar.layoutSubtreeIfNeeded()
+            let rect = container.convert(view.convert(selection.bounds(for: page), from: page), from: view)
             let size = bar.fittingSize
-            let y = view.isFlipped ? rect.minY - size.height - 6 : rect.maxY + 6
-            let maxY = view.bounds.height - size.height - 4
-            bar.frame = CGRect(x: min(max(rect.minX, 4), max(view.bounds.width - size.width - 4, 4)),
-                               y: min(max(y, 4), max(maxY, 4)), width: size.width, height: size.height)
-            bar.isHidden = !view.bounds.intersects(rect)
+            let above = container.isFlipped ? rect.minY - size.height - 6 : rect.maxY + 6
+            let maxY = container.bounds.height - size.height - 4
+            bar.frame = CGRect(x: min(max(rect.minX, 4), max(container.bounds.width - size.width - 4, 4)),
+                               y: min(max(above, 4), max(maxY, 4)), width: size.width, height: size.height)
+            bar.isHidden = !container.bounds.intersects(rect)
         }
+    }
+}
+
+/// Holds the PDF view and, on top of it as a sibling, the selection bar.
+final class ReaderContainerView: NSView {
+    let pdfView = ReaderPDFView()
+    let bar: NSView
+
+    init(bar: NSView) {
+        self.bar = bar
+        super.init(frame: .zero)
+        pdfView.autoresizingMask = [.width, .height]
+        addSubview(pdfView)
+        bar.isHidden = true
+        addSubview(bar)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override func layout() {
+        super.layout()
+        pdfView.frame = bounds
     }
 }

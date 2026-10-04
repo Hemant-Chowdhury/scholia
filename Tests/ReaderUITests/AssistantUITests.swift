@@ -42,15 +42,14 @@ struct AssistantUITests {
         let backend = FakeBackend()
         let (hosted, url) = try hostWithAgent(backend)
         try ui.click(hosted, pageIndex: 0, pagePoint: ui.helper.center(of: 0, onPage: 0, in: url), modifiers: .option)
-        let bar = try #require(ReaderWindowUITests.selectionBar(in: hosted.window.contentView!))
-        // The first button of the bar is Explain. A click there must reach the bar (SwiftUI then finds the button).
-        let point = bar.convert(CGPoint(x: 30, y: bar.bounds.midY), to: nil)
+        try await ui.settle()
+        let point = try #require(ReaderWindowUITests.explainButtonPoint(hosted))
         let frameView = try #require(hosted.window.contentView?.superview)
         let hit = try #require(frameView.hitTest(frameView.convert(point, from: nil)))
-        #expect(hit === bar || hit.isDescendant(of: bar), "click at the Explain button goes to \(type(of: hit))")
-        // SwiftUI's button view tracks the mouse in the app event loop, which a test cannot run; the real-app
-        // self-test clicks it. Here the action that the button calls runs directly.
-        hosted.model.run(.explain)
+        // The click reaches the native Explain button; performClick runs its target and action like a real click.
+        let button = try #require(hit as? NSButton, "click at the Explain button goes to \(type(of: hit))")
+        #expect(button.title == "Explain")
+        button.performClick(nil)
         try await waitFor { hosted.model.assistant.messages.last?.status == "complete" }
         #expect(hosted.model.assistant.messages.first?.text == "Explain")
     }

@@ -46,25 +46,81 @@ public enum ReaderSelfTest {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             MainActor.assumeIsolated {
                 let selected = view.currentSelection?.string ?? ""
-                let key = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
-                                           timestamp: ProcessInfo.processInfo.systemUptime,
-                                           windowNumber: window.windowNumber, context: nil, characters: "h",
-                                           charactersIgnoringModifiers: "h", isARepeat: false, keyCode: 4)
-                if let key { NSApp.postEvent(key, atStart: false) }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    MainActor.assumeIsolated {
-                        let highlights = page.annotations.filter { $0.type == "Highlight" }.count
-                        finish(folder, """
-                            page: \(pageIndex + 1)
-                            expected: \(target.text)
-                            selected: \(selected.split(whereSeparator: { $0.isWhitespace }).joined(separator: " "))
-                            highlight annotations on page: \(highlights)
-                            app active: \(NSApp.isActive), window key: \(window.isKeyWindow), first responder: \(String(describing: window.firstResponder.map { type(of: $0) }))
-                            """)
-                    }
+                if ProcessInfo.processInfo.environment["READER_SELF_TEST_ACTION"] == "explain" {
+                    clickExplain(view: view, window: window, folder: folder, selected: selected, pageIndex: pageIndex)
+                } else {
+                    pressHighlight(window: window, page: page, folder: folder, selected: selected, target: target.text, pageIndex: pageIndex)
                 }
             }
         }
+    }
+
+    private static func pressHighlight(window: NSWindow, page: PDFPage, folder: URL, selected: String, target: String, pageIndex: Int) {
+        let key = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                                   timestamp: ProcessInfo.processInfo.systemUptime,
+                                   windowNumber: window.windowNumber, context: nil, characters: "h",
+                                   charactersIgnoringModifiers: "h", isARepeat: false, keyCode: 4)
+        if let key { NSApp.postEvent(key, atStart: false) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            MainActor.assumeIsolated {
+                let highlights = page.annotations.filter { $0.type == "Highlight" }.count
+                finish(folder, """
+                    page: \(pageIndex + 1)
+                    expected: \(target)
+                    selected: \(selected.split(whereSeparator: { $0.isWhitespace }).joined(separator: " "))
+                    highlight annotations on page: \(highlights)
+                    app active: \(NSApp.isActive), window key: \(window.isKeyWindow), first responder: \(String(describing: window.firstResponder.map { type(of: $0) }))
+                    """)
+            }
+        }
+    }
+
+    /// Clicks the Explain button of the selection bar with real mouse events, then waits for the agent's answer.
+    private static func clickExplain(view: ReaderPDFView, window: NSWindow, folder: URL, selected: String, pageIndex: Int) {
+        guard let bar = (view.superview as? ReaderContainerView)?.bar, !bar.isHidden else {
+            return finish(folder, "FAIL: no selection bar; selected: \(selected)")
+        }
+        let point = bar.convert(CGPoint(x: 30, y: bar.bounds.midY), to: nil)
+        let frameView = window.contentView?.superview
+        let hit = frameView?.hitTest(frameView!.convert(point, from: nil))
+        let debug = "click: \(point); hit: \(String(describing: hit.map { type(of: $0) }))\n"
+        try? debug.write(to: folder.appendingPathComponent("debug.txt"), atomically: true, encoding: .utf8)
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                                              timestamp: ProcessInfo.processInfo.systemUptime,
+                                              windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                              clickCount: 1, pressure: 1) {
+                NSApp.postEvent(event, atStart: false)
+            }
+        }
+        let start = Date()
+        func poll() {
+            guard let model = ReaderModel.latest else { return finish(folder, "FAIL: no reader model") }
+            let assistant = model.assistant
+            let last = assistant.messages.last
+            let done = last.map { $0.role == "assistant" && ($0.status == "complete" || $0.status == "failed") } ?? false
+            if done || Date().timeIntervalSince(start) > 180 {
+                try? "answer visible".write(to: folder.appendingPathComponent("ready.txt"), atomically: true, encoding: .utf8)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                    MainActor.assumeIsolated {
+                        finish(folder, """
+                            page: \(pageIndex + 1)
+                            selected: \(selected.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ").prefix(200))
+                            panel open: \(model.showAssistant)
+                            agent: \(assistant.selectedAgentID), model: \(assistant.selectedModel ?? "default")
+                            messages: \(assistant.messages.map { "\($0.role)/\($0.status)" })
+                            error: \(assistant.errorMessage ?? "none")
+                            seconds: \(Int(Date().timeIntervalSince(start)))
+                            answer:
+                            \(last?.text ?? "")
+                            """)
+                    }
+                }
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { MainActor.assumeIsolated { poll() } }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { MainActor.assumeIsolated { poll() } }
     }
 
     private static func find(in view: NSView?) -> ReaderPDFView? {

@@ -32,6 +32,20 @@ struct MarkdownBlocksTests {
         ])
     }
 
+    @Test func parsesTablesWithoutTheSeparatorRow() {
+        let text = """
+            | Method | Used by |
+            |---|---|
+            | **BPE** | GPT-4 |
+            | WordPiece | BERT |
+            After the table.
+            """
+        #expect(MarkdownBlocks.parse(text) == [
+            .table(header: ["Method", "Used by"], rows: [["**BPE**", "GPT-4"], ["WordPiece", "BERT"]]),
+            .paragraph("After the table."),
+        ])
+    }
+
     @Test func unfinishedCodeBlockWhileStreamingIsStillCode() {
         #expect(MarkdownBlocks.parse("```\nlet x") == [.code("let x")])
     }

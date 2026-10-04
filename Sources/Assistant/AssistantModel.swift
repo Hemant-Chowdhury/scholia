@@ -54,6 +54,7 @@ public final class AssistantModel {
         self.defaults = defaults
         self.selectedAgentID = defaults.string(forKey: Self.agentKey) ?? AgentCatalog.claude.id
         self.selectedModel = defaults.string(forKey: Self.modelKey(selectedAgentID))
+            ?? AgentCatalog.all.first { $0.id == selectedAgentID }?.defaultModel
         reloadThreads()
     }
 
@@ -74,7 +75,7 @@ public final class AssistantModel {
         guard id != selectedAgentID else { return }
         selectedAgentID = id
         defaults.set(id, forKey: Self.agentKey)
-        selectedModel = defaults.string(forKey: Self.modelKey(id))
+        selectedModel = defaults.string(forKey: Self.modelKey(id)) ?? selectedAgent.defaultModel
         modelChoices = []
     }
 

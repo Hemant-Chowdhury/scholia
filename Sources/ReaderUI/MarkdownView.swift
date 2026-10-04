@@ -9,16 +9,25 @@ enum MarkdownBlocks {
         case bullet(marker: String, text: String)
         case quote(String)
         case code(String)
+        case table(header: [String], rows: [[String]])
     }
 
     static func parse(_ text: String) -> [Block] {
         var blocks: [Block] = []
         var paragraph: [String] = []
         var code: [String]?
+        var table: [[String]] = []
+
+        func flushTable() {
+            guard !table.isEmpty else { return }
+            blocks.append(.table(header: table[0], rows: Array(table.dropFirst())))
+            table = []
+        }
 
         func flush() {
             if !paragraph.isEmpty { blocks.append(.paragraph(paragraph.joined(separator: " "))) }
             paragraph = []
+            flushTable()
         }
 
         for rawLine in text.components(separatedBy: "\n") {
@@ -35,6 +44,15 @@ enum MarkdownBlocks {
             }
             if code != nil { code?.append(rawLine); continue }
             if line.isEmpty { flush(); continue }
+            if line.hasPrefix("|") {
+                if !paragraph.isEmpty { blocks.append(.paragraph(paragraph.joined(separator: " "))); paragraph = [] }
+                let cells = line.trimmingCharacters(in: CharacterSet(charactersIn: "|")).components(separatedBy: "|")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                // The separator row (|---|:---:|) is only layout.
+                if !cells.allSatisfy({ $0.allSatisfy { "-: ".contains($0) } }) { table.append(cells) }
+                continue
+            }
+            flushTable()
             if let heading = line.firstMatch(of: /^(#{1,6})\s+(.*)$/) {
                 flush()
                 blocks.append(.heading(level: heading.1.count, text: String(heading.2)))
@@ -97,6 +115,18 @@ struct MarkdownView: View {
                         .foregroundStyle(.secondary)
                         .padding(.leading, 10)
                         .overlay(alignment: .leading) { Rectangle().fill(.tertiary).frame(width: 3) }
+                case .table(let header, let rows):
+                    ScrollView(.horizontal) {
+                        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
+                            GridRow { ForEach(Array(header.enumerated()), id: \.offset) { Text(MarkdownBlocks.inline($0.element)).bold() } }
+                            Divider()
+                            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                                GridRow { ForEach(Array(row.enumerated()), id: \.offset) { Text(MarkdownBlocks.inline($0.element)) } }
+                            }
+                        }
+                        .padding(8)
+                    }
+                    .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 6))
                 case .code(let content):
                     ScrollView(.horizontal) {
                         Text(content).font(.system(.callout, design: .monospaced)).textSelection(.enabled).padding(8)

@@ -23,6 +23,8 @@ public struct AgentSpec: Sendable, Equatable, Identifiable {
     public let note: String?
     /// Models to show before the first session reports its own list.
     public var knownModels: [ACPChoice] = []
+    /// The model that Reader uses until the reader chooses one.
+    public var defaultModel: String?
 }
 
 public enum AgentCatalog {
@@ -40,7 +42,8 @@ public enum AgentCatalog {
         ])])]),
         sessionSettings: [], note: nil,
         knownModels: [ACPChoice(value: "opus", name: "Opus"), ACPChoice(value: "sonnet", name: "Sonnet"),
-                      ACPChoice(value: "haiku", name: "Haiku")])
+                      ACPChoice(value: "haiku", name: "Haiku")],
+        defaultModel: "sonnet")
 
     /// OpenCode. Its read-only "plan" mode is used; a changed tool set makes its free tier refuse requests.
     public static let opencode = AgentSpec(

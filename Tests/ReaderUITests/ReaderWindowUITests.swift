@@ -46,6 +46,11 @@ struct ReaderWindowUITests {
         }
     }
 
+    /// Lets queued main-thread work run (for example, the selection bar position), which `spin` cannot do.
+    func settle() async throws {
+        try await Task.sleep(for: .milliseconds(150))
+    }
+
     func spin(_ seconds: TimeInterval) {
         RunLoop.main.run(until: Date().addingTimeInterval(seconds))
     }
@@ -59,11 +64,17 @@ struct ReaderWindowUITests {
     }
 
     static func selectionBar(in view: NSView) -> NSView? {
-        if String(describing: type(of: view)).contains("SelectionBar"), !view.isHidden { return view }
+        if view is SelectionBarView, !view.isHidden { return view }
         for subview in view.subviews {
             if let match = selectionBar(in: subview) { return match }
         }
         return nil
+    }
+
+    /// A point on the Explain button (the first button) of the selection bar, in window coordinates.
+    static func explainButtonPoint(_ hosted: Hosted) -> CGPoint? {
+        guard let bar = hosted.window.contentView.flatMap(selectionBar(in:)) else { return nil }
+        return bar.convert(CGPoint(x: 30, y: bar.bounds.midY), to: nil)
     }
 
     func click(_ hosted: Hosted, pageIndex: Int, pagePoint: CGPoint, modifiers: NSEvent.ModifierFlags) throws {
@@ -98,10 +109,11 @@ struct ReaderWindowUITests {
         capture.waitUntilExit()
     }
 
-    @Test func optionClickSelectsParagraphInTheViewAndShowsTheBar() throws {
+    @Test func optionClickSelectsParagraphInTheViewAndShowsTheBar() async throws {
         let url = try helper.makeBook()
         let hosted = try host(url)
         try click(hosted, pageIndex: 0, pagePoint: helper.center(of: 0, onPage: 0, in: url), modifiers: .option)
+        try await settle()
         snapshot(hosted, "option-click")
         #expect(collapsed(hosted.pdfView.currentSelection?.string) == "Agents call tools in a loop.")
         #expect(collapsed(hosted.model.selectedText) == "Agents call tools in a loop.")
@@ -138,17 +150,16 @@ struct ReaderWindowUITests {
         #expect(hosted.model.highlights.count == 1)
     }
 
-    @Test func aClickOnTheBarReachesTheBarNotThePDFView() throws {
+    @Test func aClickOnTheBarDoesNotReachThePDFView() async throws {
         let url = try helper.makeBook()
         let hosted = try host(url)
         try click(hosted, pageIndex: 0, pagePoint: helper.center(of: 0, onPage: 0, in: url), modifiers: .option)
-        let content = try #require(hosted.window.contentView)
-        let bar = try #require(Self.selectionBar(in: content))
-        let center = bar.convert(CGPoint(x: bar.bounds.midX, y: bar.bounds.midY), to: nil)
-        // hitTest takes a point in the superview's coordinates; the window's frame view uses window coordinates.
-        let frameView = try #require(content.superview)
-        let hit = try #require(frameView.hitTest(frameView.convert(center, from: nil)))
-        #expect(hit === bar || hit.isDescendant(of: bar), "click goes to \(type(of: hit))")
+        try await settle()
+        let point = try #require(Self.explainButtonPoint(hosted))
+        let frameView = try #require(hosted.window.contentView?.superview)
+        let hit = try #require(frameView.hitTest(frameView.convert(point, from: nil)))
+        // PDFKit's gesture recognizers take clicks on any view inside the PDF view.
+        #expect(hit !== hosted.pdfView && !hit.isDescendant(of: hosted.pdfView), "click goes to \(type(of: hit))")
     }
 
     @Test func highlightKeyDecisionIgnoresModifiedKeys() throws {

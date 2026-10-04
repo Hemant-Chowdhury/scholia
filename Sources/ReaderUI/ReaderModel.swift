@@ -74,6 +74,9 @@ public final class ReaderModel {
         self.highlights = highlights
         self.assistant = AssistantModel(workspace: workspace, source: source, backend: backend, defaults: defaults)
         self.resolvedLocators = Self.resolve(highlights, in: source.pdf)
+        #if DEBUG
+        ReaderModel.latest = self
+        #endif
     }
 
     public var structuralPath: [String] { StructuralPath.path(forPage: currentPage, in: outline) }
@@ -88,6 +91,11 @@ public final class ReaderModel {
             lastError = "Reader cannot save the current page: \(error.localizedDescription)"
         }
     }
+
+    #if DEBUG
+    /// The last opened reader (for the real-app self-test).
+    static weak var latest: ReaderModel?
+    #endif
 
     public var selectedText: String? { selection?.string }
 
