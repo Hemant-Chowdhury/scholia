@@ -153,6 +153,15 @@ public final class AssistantModel {
     }
 
     public func followUp(_ text: String) {
+        followUp(text, shownAs: nil)
+    }
+
+    /// A quick follow-up shows its short title in the thread and sends the prompt text from the templates.
+    public func quick(_ followUp: QuickFollowUp) {
+        self.followUp(PromptTemplates.load(from: defaults).text(for: followUp), shownAs: followUp.title)
+    }
+
+    private func followUp(_ text: String, shownAs title: String?) {
         let question = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !question.isEmpty, !isRunning, let thread = currentThread else { return }
         let selection = SelectionContext(text: currentAnchor?.text ?? thread.title, pageIndex: thread.firstPage,
@@ -160,13 +169,9 @@ public final class AssistantModel {
                                          before: [], after: [])
         let transcript = messages.map { (role: $0.role, content: $0.text) }
         let context = contextSource(excluding: thread.id)
-        run(userText: question, action: ReadingAction.followup.rawValue) {
+        run(userText: title ?? question, action: ReadingAction.followup.rawValue) {
             (question, ContextBuilder.resumePrompt(context.input(selection, .followup, question), transcript: transcript))
         }
-    }
-
-    public func quick(_ followUp: QuickFollowUp) {
-        self.followUp(followUp.prompt)
     }
 
     /// Runs the last question again (for example, after an agent error). The failed question and answer are removed.
@@ -297,7 +302,8 @@ public final class AssistantModel {
     /// The data that the prompt needs, captured on the main thread, so the prompt can be made off it.
     private func contextSource(excluding threadID: String) -> PromptContextSource {
         PromptContextSource(database: workspace.database, document: workspace.document,
-                            aboutMe: defaults.string(forKey: Self.aboutMeKey) ?? "", excludedThread: threadID)
+                            aboutMe: defaults.string(forKey: Self.aboutMeKey) ?? "", excludedThread: threadID,
+                            templates: PromptTemplates.load(from: defaults))
     }
 
     private func replace(_ message: ChatMessage) {

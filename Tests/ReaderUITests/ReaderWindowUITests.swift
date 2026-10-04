@@ -55,6 +55,12 @@ struct ReaderWindowUITests {
         RunLoop.main.run(until: Date().addingTimeInterval(seconds))
     }
 
+    static func all<T: NSView>(_ type: T.Type, in view: NSView) -> [T] {
+        var found = view.subviews.flatMap { all(type, in: $0) }
+        if let match = view as? T { found.insert(match, at: 0) }
+        return found
+    }
+
     static func find<T: NSView>(_ type: T.Type, in view: NSView) -> T? {
         if let match = view as? T { return match }
         for subview in view.subviews {

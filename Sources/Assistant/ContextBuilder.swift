@@ -79,9 +79,11 @@ public struct PromptInput: Sendable {
     public let question: String?
     public let relatedThreads: [RelatedThread]
     public let relatedPassages: [RelatedPassage]
+    public let templates: PromptTemplates
 
     public init(book: BookInfo, aboutMe: String, selection: SelectionContext, action: ReadingAction, question: String?,
-                relatedThreads: [RelatedThread], relatedPassages: [RelatedPassage]) {
+                relatedThreads: [RelatedThread], relatedPassages: [RelatedPassage], templates: PromptTemplates = .standard) {
+        self.templates = templates
         self.book = book
         self.aboutMe = aboutMe
         self.selection = selection
@@ -102,7 +104,8 @@ public enum ContextBuilder {
     static let maxThreads = 3
 
     public static func firstPrompt(_ input: PromptInput) -> String {
-        (context(input) + ["Task: " + instruction(input.action, question: input.question)]).joined(separator: "\n\n")
+        (context(input) + ["Task: " + instruction(input.action, question: input.question, templates: input.templates)])
+            .joined(separator: "\n\n")
     }
 
     /// For a new session in an existing thread (after a restart, or after a change of agent or model).
@@ -115,33 +118,18 @@ public enum ContextBuilder {
         ]).joined(separator: "\n\n")
     }
 
-    public static func instruction(_ action: ReadingAction, question: String?) -> String {
+    public static func instruction(_ action: ReadingAction, question: String?, templates: PromptTemplates = .standard) -> String {
         switch action {
-        case .explain:
-            "Explain the selected text so that I understand it fully. Start with a one-sentence summary. Then explain it step by step, define each technical term, and give an example."
-        case .simplify:
-            "Explain the selected text in the simplest words, for a smart beginner. Use one concrete everyday example. Keep it short."
-        case .define:
-            "List each technical term in the selected text. For each term, give a short definition in the context of this book, one line each."
-        case .ask, .followup:
-            "Answer my question about the selected text: " + (question ?? "")
+        case .explain: templates.resolved(\.explain)
+        case .simplify: templates.resolved(\.simplify)
+        case .define: templates.resolved(\.define)
+        case .ask, .followup: templates.resolved(\.ask) + " " + (question ?? "")
         }
     }
 
     private static func context(_ input: PromptInput) -> [String] {
         let selection = input.selection
-        var parts = [
-            """
-            You are a reading tutor in the Reader app. You help the reader understand a book, one passage at a time.
-
-            Rules:
-            - Explain in the context of this book and of the reader's background.
-            - Be clear and concrete. Use short paragraphs, examples and analogies. Use Markdown.
-            - When you use content from the book, cite the page as [p. N].
-            - If the passage depends on an earlier part of the book, say which part.
-            - Do not change files and do not run commands.
-            """,
-        ]
+        var parts = [input.templates.resolved(\.rules)]
         let author = input.book.author.map { " by \($0)" } ?? ""
         let path = selection.structuralPath.isEmpty ? "" : selection.structuralPath.joined(separator: " › ") + " "
         parts.append("Book: \"\(input.book.title)\"\(author)\nLocation: \(path)(page \(selection.pageIndex + 1))")

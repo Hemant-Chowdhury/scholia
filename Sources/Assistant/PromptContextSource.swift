@@ -8,6 +8,7 @@ struct PromptContextSource: Sendable {
     let document: DocumentRecord
     let aboutMe: String
     let excludedThread: String
+    let templates: PromptTemplates
 
     func input(_ selection: SelectionContext, _ action: ReadingAction, _ question: String?) -> PromptInput {
         let nearPages = (selection.pageIndex - 1)...(selection.pageIndex + 1)
@@ -27,6 +28,6 @@ struct PromptContextSource: Sendable {
             }
         return PromptInput(book: BookInfo(title: document.title, author: document.author), aboutMe: aboutMe,
                            selection: selection, action: action, question: question,
-                           relatedThreads: threads, relatedPassages: Array(passages))
+                           relatedThreads: threads, relatedPassages: Array(passages), templates: templates)
     }
 }
