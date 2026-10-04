@@ -82,15 +82,18 @@ struct PDFKitView: NSViewRepresentable {
             positionBar(for: model.selection, in: view)
         }
 
-        /// H, E, S, D and A work on the selection in this window, also when PDFKit's internal views have the focus.
+        /// H, E, S, D and A work on the selection in this window when the PDF view or PDFKit's views inside it have the focus.
         /// Typing in a text field (for example, the search field) is not changed.
         private func startKeyMonitor(for view: PDFView) {
             keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak view] event in
                 guard let key = ReaderPDFView.readerKey(event) else { return event }
                 let eventWindow = event.window
                 let handled = MainActor.assumeIsolated { () -> Bool in
+                    // Only when the PDF view (or PDFKit's views inside it) has the focus: letters typed in
+                    // a list, the outline or a text field are not actions.
                     guard let self, let view, eventWindow === view.window,
-                          !(view.window?.firstResponder is NSText) else { return false }
+                          let focus = view.window?.firstResponder as? NSView,
+                          focus === view || focus.isDescendant(of: view) else { return false }
                     return self.model.handle(key)
                 }
                 return handled ? nil : event

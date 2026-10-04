@@ -8,8 +8,12 @@ public struct SelectionContext: Sendable, Equatable {
     public let structuralPath: [String]
     public let before: [String]
     public let after: [String]
+    /// The paragraph that contains a short selection (nil when the selection is the whole paragraph or more).
+    public var containing: String?
 
-    public init(text: String, pageIndex: Int, structuralPath: [String], before: [String], after: [String]) {
+    public init(text: String, pageIndex: Int, structuralPath: [String], before: [String], after: [String],
+                containing: String? = nil) {
+        self.containing = containing
         self.text = text
         self.pageIndex = pageIndex
         self.structuralPath = structuralPath
@@ -40,9 +44,16 @@ public struct SelectionContext: Sendable, Equatable {
             after += source.paragraphs(onPage: lastPage + 1).prefix(afterCount - after.count).map(\.text)
         }
 
-        return SelectionContext(text: TextCleaner.clean(selectedText), pageIndex: firstPage,
+        let text = TextCleaner.clean(selectedText)
+        let firstEnd = (locator.segments.first.map { $0.location + $0.length }) ?? firstStart
+        let containing = firstParagraphs.filter {
+            $0.textRange.location != NSNotFound
+                && NSIntersectionRange($0.textRange, NSRange(location: firstStart, length: max(firstEnd - firstStart, 1))).length > 0
+        }.map(\.text).joined(separator: "\n\n")
+        return SelectionContext(text: text, pageIndex: firstPage,
                                 structuralPath: StructuralPath.path(forPage: firstPage, in: outline),
-                                before: before, after: Array(after))
+                                before: before, after: Array(after),
+                                containing: containing.count > text.count + 20 ? String(containing.prefix(1200)) : nil)
     }
 
 }

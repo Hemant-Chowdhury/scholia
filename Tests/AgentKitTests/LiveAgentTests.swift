@@ -23,4 +23,23 @@ struct LiveAgentTests {
         await host.shutdown()
         #expect(text.lowercased().contains("hello reader"))
     }
+
+    /// After a model change, the session must still have only the read and search tools.
+    @Test(.enabled(if: agentID == "claude"))
+    func claudeKeepsOnlyReadAndSearchToolsAfterAModelChange() async throws {
+        let host = AgentHost(locator: .standard())
+        let cwd = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
+        let opened = try await host.openSession(agent: AgentCatalog.claude, cwd: cwd)
+        _ = try await opened.client.setConfigOption(sessionID: opened.session.id, configID: "model", value: "haiku")
+        var text = ""
+        for try await event in await opened.client.prompt(sessionID: opened.session.id,
+                                                          text: "List the exact names of all tools you can call, one per line, nothing else.") {
+            if case .text(let chunk) = event { text += chunk }
+        }
+        await host.shutdown()
+        let names = Set(text.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "-*` ")) })
+        #expect(names.isSubset(of: ["Read", "Glob", "Grep", "WebSearch"]), "tools: \(names)")
+        #expect(!names.isEmpty)
+    }
 }

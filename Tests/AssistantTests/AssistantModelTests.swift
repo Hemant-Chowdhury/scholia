@@ -158,4 +158,66 @@ struct AssistantModelTests {
         let prompt = try #require(backend.prompts.last)
         #expect(prompt.contains("Q: What are tools? A: Tools are functions."))
     }
+
+    @Test func veryLongSelectionDoesNotBlockTheWindow() async throws {
+        let f = try make()
+        await f.model.refreshAgents()
+        let long = (0..<20_000).map { "word\($0 % 3000)" }.joined(separator: " ")
+        let start = Date()
+        f.model.start(action: .explain, question: nil, locator: f.locator, selectedText: long)
+        #expect(Date().timeIntervalSince(start) < 0.5)
+        try await waitUntilIdle(f.model)
+        #expect((f.model.currentAnchor?.text.count ?? 0) <= ContextBuilder.selectionLimit + 1)
+        #expect((f.backend.prompts.first?.count ?? .max) < 40_000)
+    }
+
+    @Test func stopWhileTheAgentStartsEndsTheAnswerAtOnce() async throws {
+        let backend = FakeBackend()
+        backend.openDelay = 5
+        let f = try make(backend: backend)
+        await f.model.refreshAgents()
+        f.model.start(action: .explain, question: nil, locator: f.locator, selectedText: "Agents.")
+        try await Task.sleep(for: .milliseconds(50))
+        f.model.stop()
+        #expect(!f.model.isRunning)
+        #expect(f.model.messages.last?.status == "cancelled")
+    }
+
+    @Test func newActionDuringAnAnswerStopsItAndStartsTheNewOne() async throws {
+        let backend = FakeBackend()
+        backend.scripts = [.waitForCancel([.text("First answer")]), .events([.text("Second"), .done(stopReason: "end_turn")])]
+        let f = try make(backend: backend)
+        await f.model.refreshAgents()
+        f.model.start(action: .explain, question: nil, locator: f.locator, selectedText: "Agents call tools.")
+        for _ in 0..<200 where f.model.messages.last?.text != "First answer" { try await Task.sleep(for: .milliseconds(5)) }
+        f.model.start(action: .define, question: nil, locator: f.locator, selectedText: "The loop stops.")
+        try await waitUntilIdle(f.model)
+        #expect(f.model.messages.map(\.text) == ["Define", "Second"])
+        #expect(f.model.allThreads.count == 2)
+    }
+
+    @Test func retryAfterAFailedFirstActionSendsTheFullPrompt() async throws {
+        let backend = FakeBackend()
+        backend.scripts = [.fail("Network error.")]
+        let f = try make(backend: backend)
+        await f.model.refreshAgents()
+        f.model.start(action: .explain, question: nil, locator: f.locator, selectedText: "Agents call tools in a loop.")
+        try await waitUntilIdle(f.model)
+        f.model.retry()
+        try await waitUntilIdle(f.model)
+        #expect(backend.prompts.count == 2)
+        #expect(backend.prompts[1].contains("Task: Explain the selected text"))
+        #expect(f.model.messages.map(\.status) == ["complete", "complete"])
+    }
+
+    @Test func textBeforeAndAfterAToolGetsAParagraphBreak() async throws {
+        let backend = FakeBackend()
+        backend.scripts = [.events([.text("I will check the chapter."), .tool(id: "t", title: "Read", status: "pending"),
+                                    .text("**Summary:** a loop."), .done(stopReason: "end_turn")])]
+        let f = try make(backend: backend)
+        await f.model.refreshAgents()
+        f.model.start(action: .explain, question: nil, locator: f.locator, selectedText: "Agents.")
+        try await waitUntilIdle(f.model)
+        #expect(f.model.messages.last?.text == "I will check the chapter.\n\n**Summary:** a loop.")
+    }
 }

@@ -114,4 +114,19 @@ struct SelectionContextTests {
         #expect(context.structuralPath == ["Intro"])
         #expect(context.pageIndex == 0)
     }
+
+    @Test func paragraphThatContainsAShortSelectionIsInThePrompt() throws {
+        var page = FixturePDF.paragraph(["First paragraph here."], top: 700)
+        page += FixturePDF.paragraph(["An agent calls a model and tools in a loop."], top: 672)
+        let source = try PDFDocumentSource(url: FixturePDF.make(pages: [page]))
+        let second = try #require(source.paragraphs(onPage: 0).last)
+        let locator = PDFLocator(segments: [.init(pageIndex: 0, location: second.textRange.location + 3, length: 5)])
+        let context = SelectionContext.make(locator: locator, selectedText: "agent", source: source, outline: [])
+        #expect(context.containing == "An agent calls a model and tools in a loop.")
+        #expect(context.before == ["First paragraph here."])
+        let prompt = ContextBuilder.firstPrompt(PromptInput(
+            book: BookInfo(title: "B", author: nil), aboutMe: "", selection: context, action: .define, question: nil,
+            relatedThreads: [], relatedPassages: []))
+        #expect(prompt.contains("Paragraph with the selection:\nAn agent calls a model and tools in a loop."))
+    }
 }

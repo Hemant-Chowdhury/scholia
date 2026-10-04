@@ -49,10 +49,16 @@ struct AgentCatalogTests {
         #expect(AgentCatalog.all.filter(\.isSupported).map(\.id) == ["claude", "opencode"])
     }
 
-    @Test func claudeSessionsOnlyGetReadAndWebTools() throws {
+    @Test func claudeSessionsOnlyGetReadAndSearchToolsWithPermissionChecks() throws {
         let options = try #require(AgentCatalog.claude.sessionMeta?["claudeCode"]?["options"])
-        #expect(options["tools"] == .array(["Read", "Glob", "Grep", "WebSearch", "WebFetch"].map(JSONValue.string)))
+        #expect(options["tools"] == .array(["Read", "Glob", "Grep", "WebSearch"].map(JSONValue.string)))
         #expect(options["strictMcpConfig"] == .bool(true))
+        // The user's own settings can allow tools with no request; without them, a read outside the
+        // workspace needs a permission request, and Reader refuses it.
+        #expect(options["settingSources"] == .array([]))
+        #expect(options["permissionMode"] == .string("default"))
+        #expect(options["disallowedTools"]?.arrayValue?.contains(.string("WebFetch")) == true)
+        #expect(AgentCatalog.claude.command.last == "@agentclientprotocol/claude-agent-acp@0.85.1")
         #expect(AgentCatalog.opencode.sessionSettings == [AgentSpec.Setting(configID: "mode", value: "plan")])
     }
 }
@@ -108,5 +114,32 @@ struct AgentHostTests {
         try await Task.sleep(for: .milliseconds(50))
         _ = try await host.openSession(agent: AgentCatalog.opencode, cwd: cwd)
         #expect(factory.count == 2)
+    }
+
+    @Test func sessionWhoseSafetySettingIsNotAppliedIsRefused() async throws {
+        let transport = FakeTransport()
+        transport.responder = { message in
+            guard let method = message["method"]?.stringValue, let id = message["id"]?.intValue else { return [] }
+            switch method {
+            case "initialize": return [#"{"jsonrpc":"2.0","id":\#(id),"result":{}}"#]
+            case "session/new": return [#"{"jsonrpc":"2.0","id":\#(id),"result":{"sessionId":"s1","configOptions":[{"id":"mode","currentValue":"build","options":[{"value":"build"},{"value":"plan"}]}]}}"#]
+            default: return [#"{"jsonrpc":"2.0","id":\#(id),"result":{"configOptions":null}}"#]
+            }
+        }
+        let locator = AgentLocator(searchPath: [try AgentCatalogTests().folder(with: ["opencode"])])
+        let host = AgentHost(locator: locator) { _, _ in transport }
+        await #expect(throws: AgentError.unsafeSession(name: "OpenCode")) {
+            _ = try await host.openSession(agent: AgentCatalog.opencode, cwd: URL(fileURLWithPath: "/tmp"))
+        }
+    }
+
+    @Test func twoOpensAtTheSameTimeStartOneProcess() async throws {
+        let factory = Factory()
+        let host = try host(factory, binaries: ["opencode"])
+        let cwd = URL(fileURLWithPath: "/tmp/ws")
+        async let first = host.openSession(agent: AgentCatalog.opencode, cwd: cwd)
+        async let second = host.openSession(agent: AgentCatalog.opencode, cwd: cwd)
+        _ = try await (first, second)
+        #expect(factory.count == 1)
     }
 }

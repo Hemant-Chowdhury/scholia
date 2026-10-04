@@ -14,3 +14,17 @@ struct FTSQueryTests {
         #expect(FTSQuery.anyTerm("--- () \"\"") == nil)
     }
 }
+
+struct FTSQueryLimitTests {
+    @Test func longTextGivesAtMostThirtyTermsWithoutStopWords() throws {
+        let words = (0..<500).map { "word\($0)" } + Array(repeating: "the", count: 50)
+        let query = try #require(FTSQuery.anyTerm(words.joined(separator: " ")))
+        let terms = query.components(separatedBy: " OR ")
+        #expect(terms.count == 30)
+        #expect(!terms.contains("\"the\""))
+    }
+
+    @Test func repeatedWordsAreUsedOnce() {
+        #expect(FTSQuery.anyTerm("loop loop Loop agent") == "\"loop\" OR \"agent\"")
+    }
+}

@@ -52,6 +52,13 @@ extension WorkspaceDatabase {
         }
     }
 
+    public func deleteMessages(ids: [String], threadID: String) throws {
+        try queue.write { db in
+            _ = try MessageRecord.deleteAll(db, keys: ids)
+            try Self.refreshThreadText(db, threadID: threadID)
+        }
+    }
+
     public func updateThreadAgent(threadID: String, agentID: String, modelID: String?) throws {
         try queue.write {
             try $0.execute(sql: "UPDATE thread SET agent_id = ?, model_id = ? WHERE id = ?", arguments: [agentID, modelID, threadID])

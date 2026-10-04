@@ -1,4 +1,6 @@
+import Darwin
 import Foundation
+import Synchronization
 
 /// Runs an agent program and exchanges lines with it through stdin and stdout.
 public final class ProcessTransport: LineTransport, @unchecked Sendable {
@@ -12,6 +14,8 @@ public final class ProcessTransport: LineTransport, @unchecked Sendable {
     private var errorTail = Data()
 
     public init(executable: URL, arguments: [String], environment: [String: String], currentDirectory: URL) throws {
+        // A write to an agent that just stopped must give an error, not end Reader.
+        signal(SIGPIPE, SIG_IGN)
         let (stream, continuation) = AsyncStream.makeStream(of: String.self)
         lines = stream
         process.executableURL = executable
@@ -42,6 +46,36 @@ public final class ProcessTransport: LineTransport, @unchecked Sendable {
             }
         }
         try process.run()
+        Self.registry.withLock { $0.append(WeakTransport(value: self)) }
+    }
+
+    private struct WeakTransport: @unchecked Sendable { weak var value: ProcessTransport? }
+    private static let registry = Mutex<[WeakTransport]>([])
+
+    /// Stops all agent processes and their child processes (npx starts node, which starts the agent).
+    public static func terminateAll() {
+        let transports = registry.withLock { list in
+            defer { list.removeAll() }
+            return list.compactMap(\.value)
+        }
+        for transport in transports { transport.terminateTree() }
+    }
+
+    func terminateTree() {
+        try? input.fileHandleForWriting.close()
+        guard process.isRunning else { return }
+        Self.signalTree(process.processIdentifier, SIGTERM)
+    }
+
+    private static func signalTree(_ pid: pid_t, _ signalNumber: Int32) {
+        var children = [pid_t](repeating: 0, count: 256)
+        let bytes = proc_listchildpids(pid, &children, Int32(children.count * MemoryLayout<pid_t>.size))
+        if bytes > 0 {
+            for child in children.prefix(Int(bytes) / MemoryLayout<pid_t>.size) where child > 0 {
+                signalTree(child, signalNumber)
+            }
+        }
+        kill(pid, signalNumber)
     }
 
     /// The last part of the agent's error output, for error messages.
@@ -55,8 +89,7 @@ public final class ProcessTransport: LineTransport, @unchecked Sendable {
     }
 
     public func close() async {
-        try? input.fileHandleForWriting.close()
-        if process.isRunning { process.terminate() }
+        terminateTree()
     }
 
     private func receive(_ data: Data, to continuation: AsyncStream<String>.Continuation) {

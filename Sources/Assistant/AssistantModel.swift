@@ -44,7 +44,8 @@ public final class AssistantModel {
     @ObservationIgnored private var runTask: Task<Void, Never>?
     @ObservationIgnored private var runningHandle: AgentSessionHandle?
     @ObservationIgnored private var currentPage = 0
-    @ObservationIgnored private var lastRun: (userText: String, action: String, firstPrompt: String, resumePrompt: String?)?
+    @ObservationIgnored private var lastRun: (userText: String, action: String, prompts: Prompts)?
+    @ObservationIgnored private var runID: UUID?
 
     public init(workspace: OpenedWorkspace, source: PDFDocumentSource, backend: AgentBackend, defaults: UserDefaults = .standard) {
         self.workspace = workspace
@@ -119,10 +120,12 @@ public final class AssistantModel {
 
     // MARK: Actions
 
-    /// Starts a new thread about the selection.
+    /// Starts a new thread about the selection. An answer that is running stops first.
     public func start(action: ReadingAction, question: String?, locator: PDFLocator, selectedText: String) {
-        guard !isRunning else { return }
-        let selection = SelectionContext.make(locator: locator, selectedText: selectedText, source: source, outline: outline)
+        if isRunning { stop() }
+        // A long selection (for example, the whole book) is cut first, so nothing below gets slow.
+        let clipped = String(selectedText.prefix(ContextBuilder.selectionLimit))
+        let selection = SelectionContext.make(locator: locator, selectedText: clipped, source: source, outline: outline)
         guard !selection.text.isEmpty else { return }
         let now = Date()
         let anchor = AnchorRecord(
@@ -142,9 +145,10 @@ public final class AssistantModel {
         currentAnchor = anchor
         messages = []
         let visible = action == .ask ? (question ?? "") : action.title
-        let input = promptInput(selection: selection, action: action, question: question, excluding: thread.id)
-        run(userText: visible, action: action.rawValue, firstPrompt: ContextBuilder.firstPrompt(input),
-            resumePrompt: nil)
+        let context = contextSource(excluding: thread.id)
+        run(userText: visible, action: action.rawValue) {
+            (ContextBuilder.firstPrompt(context.input(selection, action, question)), nil)
+        }
         reloadThreads()
     }
 
@@ -154,37 +158,53 @@ public final class AssistantModel {
         let selection = SelectionContext(text: currentAnchor?.text ?? thread.title, pageIndex: thread.firstPage,
                                          structuralPath: StructuralPath.path(forPage: thread.firstPage, in: outline),
                                          before: [], after: [])
-        let input = promptInput(selection: selection, action: .followup, question: question, excluding: thread.id)
         let transcript = messages.map { (role: $0.role, content: $0.text) }
-        run(userText: question, action: ReadingAction.followup.rawValue, firstPrompt: question,
-            resumePrompt: ContextBuilder.resumePrompt(input, transcript: transcript))
-    }
-
-    /// Runs the last question again (for example, after an agent error).
-    public func retry() {
-        guard !isRunning, let last = lastRun else { return }
-        run(userText: last.userText, action: last.action, firstPrompt: last.firstPrompt, resumePrompt: last.resumePrompt)
+        let context = contextSource(excluding: thread.id)
+        run(userText: question, action: ReadingAction.followup.rawValue) {
+            (question, ContextBuilder.resumePrompt(context.input(selection, .followup, question), transcript: transcript))
+        }
     }
 
     public func quick(_ followUp: QuickFollowUp) {
         self.followUp(followUp.prompt)
     }
 
-    public func stop() {
-        guard isRunning, let handle = runningHandle else { return }
-        Task { await handle.cancel() }
+    /// Runs the last question again (for example, after an agent error). The failed question and answer are removed.
+    public func retry() {
+        guard !isRunning, let last = lastRun, let thread = currentThread else { return }
+        if messages.last?.status == "failed" {
+            let failed = messages.suffix(2).map(\.id)
+            messages.removeLast(min(2, messages.count))
+            try? workspace.database.deleteMessages(ids: failed, threadID: thread.id)
+        }
+        run(userText: last.userText, action: last.action, prompts: last.prompts)
     }
 
-    /// Sends a prompt and streams the answer into a new assistant message. `resumePrompt` is used instead of
-    /// `firstPrompt` when the thread has no open session (a follow-up after a restart or an agent change).
-    private func run(userText: String, action: String, firstPrompt: String, resumePrompt: String?) {
+    /// Stops the answer at once. The agent gets a cancel request; the partial answer stays, marked as stopped.
+    public func stop() {
+        guard isRunning else { return }
+        runID = nil
+        runTask?.cancel()
+        if let handle = runningHandle { Task { await handle.cancel() } }
+        if let thread = currentThread, var answer = messages.last, answer.role == "assistant", answer.status == "streaming" {
+            answer.status = "cancelled"
+            replace(answer)
+            save(answer, thread: thread.id)
+        }
+        isRunning = false
+        activity = nil
+        runningHandle = nil
+        reloadThreads()
+    }
+
+    typealias Prompts = @Sendable () -> (first: String, resume: String?)
+
+    /// Sends a prompt and streams the answer into a new assistant message. The prompts are made off the main
+    /// thread (they search the book). `resume` is used instead of `first` when the thread has no open session.
+    private func run(userText: String, action: String, prompts: @escaping Prompts) {
         guard let thread = currentThread else { return }
         errorMessage = nil
-        lastRun = (userText, action, firstPrompt, resumePrompt ?? ContextBuilder.resumePrompt(
-            promptInput(selection: SelectionContext(text: currentAnchor?.text ?? thread.title, pageIndex: thread.firstPage,
-                                                    structuralPath: [], before: [], after: []),
-                        action: .followup, question: userText, excluding: thread.id),
-            transcript: messages.map { (role: $0.role, content: $0.text) }))
+        lastRun = (userText, action, prompts)
         let user = ChatMessage(id: UUID().uuidString, role: "user", action: action, text: userText, status: "complete",
                                error: nil, createdAt: Date())
         var answer = ChatMessage(id: UUID().uuidString, role: "assistant", action: nil, text: "", status: "streaming",
@@ -196,21 +216,30 @@ public final class AssistantModel {
         activity = "Starting \(selectedAgent.name)…"
         let agent = selectedAgent
         let model = selectedModel
+        let id = UUID()
+        runID = id
 
         runTask = Task { [weak self] in
             guard let self else { return }
             do {
+                let built = await Task.detached(priority: .userInitiated) { prompts() }.value
                 let (handle, isNew) = try await self.session(for: thread.id, agent: agent, model: model)
+                guard self.runID == id else { return }
                 self.runningHandle = handle
-                let prompt = isNew ? (resumePrompt ?? firstPrompt) : firstPrompt
                 self.activity = "\(agent.name) is thinking…"
                 var lastSave = Date()
-                for try await event in await handle.prompt(prompt) {
+                var toolSinceText = false
+                for try await event in await handle.prompt(isNew ? (built.resume ?? built.first) : built.first) {
+                    guard self.runID == id else { return }
                     switch event {
                     case .text(let chunk):
+                        // Text before and after a tool call are separate paragraphs.
+                        if toolSinceText && !answer.text.isEmpty && !answer.text.hasSuffix("\n\n") { answer.text += "\n\n" }
+                        toolSinceText = false
                         answer.text += chunk
                         self.activity = nil
                     case .tool(_, let title, _):
+                        toolSinceText = true
                         if let title { self.activity = title }
                     case .thought:
                         break
@@ -223,13 +252,16 @@ public final class AssistantModel {
                         lastSave = Date()
                     }
                 }
-                if answer.status == "streaming" { answer.status = "complete" }
+                if answer.status == "streaming" { answer.status = Task.isCancelled ? "cancelled" : "complete" }
             } catch {
+                guard self.runID == id else { return }
                 answer.status = "failed"
                 answer.error = error.localizedDescription
                 self.errorMessage = error.localizedDescription
                 self.sessions[thread.id] = nil
             }
+            guard self.runID == id else { return }
+            self.runID = nil
             self.replace(answer)
             self.save(answer, thread: thread.id)
             self.isRunning = false
@@ -239,7 +271,8 @@ public final class AssistantModel {
         }
     }
 
-    /// The open session of the thread, or a new one. A new session gets the chosen model.
+    /// The open session of the thread, or a new one. A new session gets the chosen model; the agent's safety
+    /// settings are checked again after the change.
     private func session(for threadID: String, agent: AgentSpec, model: String?) async throws -> (AgentSessionHandle, Bool) {
         if let existing = sessions[threadID], existing.agent == agent.id, existing.model == model {
             return (existing.handle, false)
@@ -249,35 +282,22 @@ public final class AssistantModel {
         if let model, let current = options.first(where: { $0.id == "model" })?.currentValue, current != model,
            options.first(where: { $0.id == "model" })?.choices.contains(where: { $0.value == model }) == true {
             options = try await handle.setOption("model", model)
+            try AgentHost.verify(agent, options: options.isEmpty ? handle.configOptions : options)
         }
         let modelOption = options.first { $0.id == "model" }
         modelChoices = modelOption?.choices ?? []
         let effective = modelOption?.currentValue ?? model
-        if selectedModel == nil { selectedModel = effective }
-        sessions[threadID] = (agent.id, model ?? effective, handle)
+        if selectedModel == nil || !modelChoices.contains(where: { $0.value == selectedModel }) { selectedModel = effective }
+        // The key is the model in use, so the next question in this thread finds this session.
+        sessions[threadID] = (agent.id, selectedModel, handle)
         try? workspace.database.updateThreadAgent(threadID: threadID, agentID: agent.id, modelID: effective)
         return (handle, true)
     }
 
-    private func promptInput(selection: SelectionContext, action: ReadingAction, question: String?, excluding threadID: String) -> PromptInput {
-        let database = workspace.database
-        let passages = ((try? database.searchText(selection.text, limit: 12)) ?? [])
-            .filter { $0.pageIndex != selection.pageIndex && $0.text.count > 40 }
-            .prefix(ContextBuilder.maxPassages)
-            .map { RelatedPassage(page: $0.pageIndex, text: $0.text) }
-        let threads = ((try? database.relatedThreads(to: selection.text + " " + (question ?? ""),
-                                                     documentID: workspace.document.id, excluding: threadID)) ?? [])
-            .compactMap { thread -> RelatedThread? in
-                let messages = (try? database.messages(threadID: thread.id)) ?? []
-                guard let question = messages.first(where: { $0.role == "user" }),
-                      let answer = messages.first(where: { $0.role == "assistant" && !$0.content.isEmpty }) else { return nil }
-                let asked = question.action == ReadingAction.ask.rawValue || question.action == ReadingAction.followup.rawValue
-                    ? question.content : "\(question.content): \(thread.title)"
-                return RelatedThread(question: asked, answerStart: answer.content, page: thread.firstPage)
-            }
-        return PromptInput(book: BookInfo(title: workspace.document.title, author: workspace.document.author),
-                           aboutMe: defaults.string(forKey: Self.aboutMeKey) ?? "", selection: selection,
-                           action: action, question: question, relatedThreads: threads, relatedPassages: Array(passages))
+    /// The data that the prompt needs, captured on the main thread, so the prompt can be made off it.
+    private func contextSource(excluding threadID: String) -> PromptContextSource {
+        PromptContextSource(database: workspace.database, document: workspace.document,
+                            aboutMe: defaults.string(forKey: Self.aboutMeKey) ?? "", excludedThread: threadID)
     }
 
     private func replace(_ message: ChatMessage) {

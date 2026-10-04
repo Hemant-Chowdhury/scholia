@@ -1,3 +1,4 @@
+import AgentKit
 import AppKit
 import ReaderUI
 import SwiftUI
@@ -15,6 +16,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         ReaderSelfTest.run()
         #endif
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        ProcessTransport.terminateAll()
     }
 
     /// Finder: double-click or "Open With › Reader".

@@ -12,8 +12,12 @@ func scriptedAgent(_ transport: FakeTransport, promptUpdates: [String] = [], pro
         case "session/new":
             return [#"{"jsonrpc":"2.0","id":\#(id),"result":{"sessionId":"s1","configOptions":[{"id":"model","name":"Model","currentValue":"opus","options":[{"value":"opus","name":"Opus"},{"value":"haiku","name":"Haiku"}]},{"id":"mode","name":"Mode","currentValue":"default","options":[{"value":"default","name":"Default"}]}]}}"#]
         case "session/set_config_option":
+            // Like the real agents: the reply lists the options, with the new value of the changed one.
+            let config = message["params"]?["configId"]?.stringValue ?? ""
             let value = message["params"]?["value"]?.stringValue ?? ""
-            return [#"{"jsonrpc":"2.0","id":\#(id),"result":{"configOptions":[{"id":"model","name":"Model","currentValue":"\#(value)","options":[{"value":"opus","name":"Opus"},{"value":"haiku","name":"Haiku"}]}]}}"#]
+            let model = config == "model" ? value : "opus"
+            let mode = config == "mode" ? value : "default"
+            return [#"{"jsonrpc":"2.0","id":\#(id),"result":{"configOptions":[{"id":"model","name":"Model","currentValue":"\#(model)","options":[{"value":"opus","name":"Opus"},{"value":"haiku","name":"Haiku"}]},{"id":"mode","name":"Mode","currentValue":"\#(mode)","options":[{"value":"default","name":"Default"},{"value":"plan","name":"Plan"}]}]}}"#]
         case "session/prompt":
             let updates = promptUpdates.map { #"{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":\#($0)}}"# }
             if let promptError {

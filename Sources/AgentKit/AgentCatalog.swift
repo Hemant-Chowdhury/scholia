@@ -28,17 +28,22 @@ public struct AgentSpec: Sendable, Equatable, Identifiable {
 }
 
 public enum AgentCatalog {
-    /// Claude Code through the ACP adapter. The session gets only read and web tools, and no MCP servers
-    /// (the user's own settings can allow shell commands with no permission request).
+    /// Claude Code through the ACP adapter (pinned version: its `_meta` options carry the safety settings).
+    /// The session gets only read and search tools and no MCP servers. The user's own settings are not loaded
+    /// (they can allow tools with no request), so a read outside the workspace needs a permission request,
+    /// which Reader refuses. WebFetch is not given: a malicious PDF could tell the agent to send data out.
     public static let claude = AgentSpec(
         id: "claude", name: "Claude Code", requiredBinaries: ["claude", "npx"],
-        command: ["npx", "-y", "@agentclientprotocol/claude-agent-acp"], isSupported: true,
+        command: ["npx", "-y", "@agentclientprotocol/claude-agent-acp@0.85.1"], isSupported: true,
         installHint: "Install Claude Code from https://claude.com/claude-code and Node.js (for npx).",
         loginHint: "Run `claude` in Terminal and log in.",
         sessionMeta: .object(["claudeCode": .object(["options": .object([
-            "tools": .array(["Read", "Glob", "Grep", "WebSearch", "WebFetch"].map(JSONValue.string)),
+            "tools": .array(["Read", "Glob", "Grep", "WebSearch"].map(JSONValue.string)),
             "strictMcpConfig": .bool(true),
-            "disallowedTools": .array(["Bash", "Edit", "Write", "MultiEdit", "NotebookEdit", "Agent", "Task"].map(JSONValue.string)),
+            "settingSources": .array([]),
+            "permissionMode": .string("default"),
+            "disallowedTools": .array(["Bash", "Edit", "Write", "MultiEdit", "NotebookEdit", "Agent", "Task", "WebFetch"]
+                .map(JSONValue.string)),
         ])])]),
         sessionSettings: [], note: nil,
         knownModels: [ACPChoice(value: "opus", name: "Opus"), ACPChoice(value: "sonnet", name: "Sonnet"),
@@ -89,6 +94,8 @@ public struct AgentAvailability: Sendable, Equatable, Identifiable {
 public enum AgentError: Error, Equatable, LocalizedError {
     case notInstalled(name: String, missing: [String])
     case notSupported(name: String)
+    case unsafeSession(name: String)
+    case timedOut(name: String)
 
     public var errorDescription: String? {
         switch self {
@@ -96,6 +103,10 @@ public enum AgentError: Error, Equatable, LocalizedError {
             "\(name) is not installed. Reader cannot find: \(missing.joined(separator: ", "))."
         case .notSupported(let name):
             "Reader does not support \(name) yet."
+        case .unsafeSession(let name):
+            "\(name) did not accept Reader's read-only settings, so Reader did not use it."
+        case .timedOut(let name):
+            "\(name) did not start in time. Check that it works in Terminal, then try again."
         }
     }
 }

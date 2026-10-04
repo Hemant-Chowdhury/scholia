@@ -162,6 +162,9 @@ public enum ContextBuilder {
         if !selection.before.isEmpty {
             parts.append("Text before the selection:\n" + selection.before.map { clip($0, paragraphLimit) }.joined(separator: "\n\n"))
         }
+        if let containing = selection.containing {
+            parts.append("Paragraph with the selection:\n" + clip(containing, paragraphLimit))
+        }
         parts.append("Selected text (page \(selection.pageIndex + 1)):\n\"\"\"\n\(clip(selection.text, selectionLimit))\n\"\"\"")
         if !selection.after.isEmpty {
             parts.append("Text after the selection:\n" + selection.after.map { clip($0, paragraphLimit) }.joined(separator: "\n\n"))

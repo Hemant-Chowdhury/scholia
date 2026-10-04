@@ -13,6 +13,8 @@ public final class FakeBackend: AgentBackend, @unchecked Sendable {
     public var optionsSet: [(String, String)] = []
     public var installed = true
     public var cancelled = false
+    /// Seconds that openSession waits, like a slow first `npx` start.
+    public var openDelay: Double = 0
 
     public init() {}
 
@@ -23,6 +25,7 @@ public final class FakeBackend: AgentBackend, @unchecked Sendable {
 
     public func openSession(agent: AgentSpec, cwd: URL) async throws -> AgentSessionHandle {
         guard installed || agent.id != "claude" else { throw AgentError.notInstalled(name: agent.name, missing: ["claude"]) }
+        if openDelay > 0 { try await Task.sleep(for: .seconds(openDelay)) }
         lock.withLock { sessionsOpened += 1 }
         return FakeSession(backend: self)
     }
