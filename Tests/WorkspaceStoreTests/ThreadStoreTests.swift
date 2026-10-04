@@ -83,3 +83,33 @@ struct ThreadStoreTests {
         #expect(try database.anchor(id: "a1") != nil)
     }
 }
+
+struct ThreadSummaryTests {
+    let store = ThreadStoreTests()
+
+    @Test func summariesHaveChapterQuestionAndAnswerStart() throws {
+        let database = try store.database()
+        try database.createThread(store.thread("t1", page: 3, anchorID: "a1"), anchor: store.anchor("a1", page: 3))
+        try database.saveMessage(store.message("m1", thread: "t1", role: "user", "Explain", at: 1001))
+        try database.saveMessage(store.message("m2", thread: "t1", role: "assistant", "An agent is a loop. It calls tools.", at: 1002))
+        try database.createThread(store.thread("t2", page: 1, anchorID: nil), anchor: nil)
+        let summaries = try database.threadSummaries(documentID: "doc-1")
+        #expect(summaries.map(\.thread.id) == ["t2", "t1"])
+        let first = try #require(summaries.last)
+        #expect(first.structuralPath == "Chapter 1")
+        #expect(first.question == "Explain")
+        #expect(first.answerStart == "An agent is a loop. It calls tools.")
+        #expect(first.messageCount == 2)
+        #expect(summaries.first?.structuralPath == "")
+    }
+
+    @Test func searchFindsThreadsByTheirAnswers() throws {
+        let database = try store.database()
+        try database.createThread(store.thread("t1", page: 3, anchorID: nil), anchor: nil)
+        try database.saveMessage(store.message("m1", thread: "t1", role: "assistant", "Byte pair encoding merges pairs.", at: 1001))
+        try database.createThread(store.thread("t2", page: 4, anchorID: nil), anchor: nil)
+        try database.saveMessage(store.message("m2", thread: "t2", role: "assistant", "Reward models score answers.", at: 1002))
+        #expect(try database.searchThreads("encoding", documentID: "doc-1") == ["t1"])
+        #expect(try database.searchThreads("", documentID: "doc-1").isEmpty)
+    }
+}

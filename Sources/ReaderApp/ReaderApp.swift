@@ -79,6 +79,14 @@ struct ReaderApp: App {
         }
         .defaultSize(width: 1400, height: 950)
 
+        WindowGroup(id: "study", for: String.self) { $workspaceID in
+            if let workspaceID {
+                StudyWindow(workspaceID: workspaceID, library: library)
+                    .modifier(OpenQueueHandler())
+            }
+        }
+        .defaultSize(width: 1200, height: 860)
+
         Settings {
             SettingsView()
         }

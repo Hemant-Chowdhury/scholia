@@ -14,6 +14,19 @@ public final class Library {
     @ObservationIgnored private var openReaderWindows = 0
     /// One agent host for the app; the agent search PATH comes from the login shell (read one time, off the main thread).
     @ObservationIgnored private var agentHost: AgentHost?
+    /// The open book windows, by workspace ID (for the Study window).
+    @ObservationIgnored private var readers: [String: WeakReader] = [:]
+
+    private struct WeakReader { weak var model: ReaderModel? }
+
+    public func reader(forWorkspace id: String) -> ReaderModel? {
+        readers[id]?.model
+    }
+
+    /// The last known file of a workspace (to open the book from a Study window).
+    public func documentURL(forWorkspace id: String) -> URL? {
+        recents.first { $0.workspaceID == id }.map { URL(fileURLWithPath: $0.lastPath) }
+    }
 
     public init(paths: AppPaths? = nil) {
         var manager: WorkspaceManager?
@@ -47,7 +60,9 @@ public final class Library {
         guard let manager else { throw CocoaError(.fileReadUnknown) }
         let workspace = try await Task.detached(priority: .userInitiated) { try manager.open(pdfAt: url) }.value
         refreshRecents()
-        return try ReaderModel(workspace: workspace, pdfURL: url, backend: await backend())
+        let model = try ReaderModel(workspace: workspace, pdfURL: url, backend: await backend())
+        readers[workspace.id] = WeakReader(model: model)
+        return model
     }
 
     public func backend() async -> AgentBackend {

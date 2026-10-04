@@ -90,3 +90,50 @@ extension WorkspaceDatabase {
                        arguments: [threadID, ([title] + parts).joined(separator: "\n")])
     }
 }
+
+/// A thread with what a list of threads shows: the chapter, the first question and the start of the first answer.
+public struct ThreadSummary: Sendable, Equatable, Identifiable {
+    public let thread: ThreadRecord
+    public let structuralPath: String
+    public let question: String
+    public let answerStart: String
+    public let messageCount: Int
+
+    public var id: String { thread.id }
+}
+
+extension WorkspaceDatabase {
+    /// All threads of a document in page order.
+    public func threadSummaries(documentID: String) throws -> [ThreadSummary] {
+        try queue.read { db in
+            let threads = try ThreadRecord.fetchAll(db, sql: """
+                SELECT * FROM thread WHERE document_id = ? ORDER BY first_page, created_at
+                """, arguments: [documentID])
+            return try threads.map { thread in
+                let path = try thread.anchorID.flatMap {
+                    try String.fetchOne(db, sql: "SELECT structural_path FROM anchor WHERE id = ?", arguments: [$0])
+                } ?? ""
+                let question = try String.fetchOne(db, sql: """
+                    SELECT content FROM message WHERE thread_id = ? AND role = 'user' ORDER BY created_at, rowid LIMIT 1
+                    """, arguments: [thread.id]) ?? ""
+                let answer = try String.fetchOne(db, sql: """
+                    SELECT substr(content, 1, 300) FROM message WHERE thread_id = ? AND role = 'assistant' AND content != ''
+                    ORDER BY created_at, rowid LIMIT 1
+                    """, arguments: [thread.id]) ?? ""
+                let count = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM message WHERE thread_id = ?", arguments: [thread.id]) ?? 0
+                return ThreadSummary(thread: thread, structuralPath: path, question: question, answerStart: answer, messageCount: count)
+            }
+        }
+    }
+
+    /// IDs of the threads of a document whose title, questions or answers match the text.
+    public func searchThreads(_ text: String, documentID: String) throws -> [String] {
+        guard let match = FTSQuery.anyTerm(text) else { return [] }
+        return try queue.read { db in
+            try String.fetchAll(db, sql: """
+                SELECT thread_text.thread_id FROM thread_text JOIN thread ON thread.id = thread_text.thread_id
+                WHERE thread_text MATCH ? AND thread.document_id = ? ORDER BY bm25(thread_text) LIMIT 200
+                """, arguments: [match, documentID])
+        }
+    }
+}

@@ -6,6 +6,7 @@ import WorkspaceStore
 public struct ReaderView: View {
     @Bindable var model: ReaderModel
     @State private var query = ""
+    @Environment(\.openWindow) private var openWindow
 
     public init(model: ReaderModel) {
         self.model = model
@@ -34,6 +35,13 @@ public struct ReaderView: View {
         .onChange(of: query) { if query.isEmpty { model.search("") } }
         .toolbar {
             ToolbarItem { IndexStatusView(progress: model.indexProgress, error: model.lastError) }
+            ToolbarItem {
+                Button { openWindow(id: "study", value: model.workspace.id) } label: {
+                    Label("Study", systemImage: "books.vertical")
+                }
+                .help("Open all questions and answers about this book (⇧⌘L)")
+                .keyboardShortcut("l", modifiers: [.command, .shift])
+            }
             ToolbarItem {
                 Button { model.showAssistant.toggle() } label: { Label("Assistant", systemImage: "sparkles") }
                     .help("Show or hide the assistant (⌥⌘0)")
