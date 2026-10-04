@@ -15,7 +15,7 @@ struct ReaderWindow: View {
             if let model {
                 ReaderView(model: model)
             } else if let errorMessage {
-                ContentUnavailableView("Reader cannot open this file", systemImage: "exclamationmark.triangle",
+                ContentUnavailableView("Scholia cannot open this file", systemImage: "exclamationmark.triangle",
                                        description: Text(errorMessage))
             } else {
                 ProgressView("Opening…")

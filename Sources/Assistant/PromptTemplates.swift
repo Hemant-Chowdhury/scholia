@@ -19,7 +19,7 @@ public struct PromptTemplates: Sendable, Equatable, Codable {
 
     public static let standard = PromptTemplates(
         rules: """
-            You are a reading tutor in the Reader app. You help the reader understand a book, one passage at a time.
+            You are a reading tutor in the Scholia app. You help the reader understand a book, one passage at a time.
 
             Rules:
             - Explain in the context of this book and of the reader's background.

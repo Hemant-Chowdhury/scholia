@@ -69,7 +69,7 @@ public enum AgentCatalog {
     private static func unsupported(_ id: String, _ name: String, _ binaries: [String], _ hint: String) -> AgentSpec {
         AgentSpec(id: id, name: name, requiredBinaries: binaries, command: binaries, isSupported: false,
                   installHint: hint, loginHint: "", sessionMeta: nil, sessionSettings: [],
-                  note: "Reader finds this agent, but it does not support it yet.")
+                  note: "Scholia finds this agent, but it does not support it yet.")
     }
 }
 
@@ -102,11 +102,11 @@ public enum AgentError: Error, Equatable, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .notInstalled(let name, let missing):
-            "\(name) is not installed. Reader cannot find: \(missing.joined(separator: ", "))."
+            "\(name) is not installed. Scholia cannot find: \(missing.joined(separator: ", "))."
         case .notSupported(let name):
-            "Reader does not support \(name) yet."
+            "Scholia does not support \(name) yet."
         case .unsafeSession(let name):
-            "\(name) did not accept Reader's read-only settings, so Reader did not use it."
+            "\(name) did not accept Scholia's read-only settings, so Scholia did not use it."
         case .timedOut(let name):
             "\(name) did not start in time. Check that it works in Terminal, then try again."
         }

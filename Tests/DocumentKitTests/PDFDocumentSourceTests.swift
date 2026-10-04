@@ -65,7 +65,7 @@ struct PDFDocumentSourceTests {
         let url = URL(fileURLWithPath: "/nonexistent/moved-book.pdf")
         #expect(throws: DocumentError.notFound(url)) { try PDFDocumentSource(url: url) }
         #expect(DocumentError.notFound(url).errorDescription
-            == "Reader cannot find this file at /nonexistent/moved-book.pdf. If you moved it, open it again from its new location.")
+            == "Scholia cannot find this file at /nonexistent/moved-book.pdf. If you moved it, open it again from its new location.")
     }
 
     @Test func lockedFileThrowsLocked() throws {
@@ -75,7 +75,7 @@ struct PDFDocumentSourceTests {
 
     @Test func errorsHaveUserMessages() {
         let url = URL(fileURLWithPath: "/tmp/a.pdf")
-        #expect(DocumentError.locked(url).errorDescription == "This PDF has a password. Reader cannot open it.")
+        #expect(DocumentError.locked(url).errorDescription == "This PDF has a password. Scholia cannot open it.")
         #expect(DocumentError.cannotOpen(url).errorDescription == "This file is not a valid PDF, or it is damaged.")
     }
 }

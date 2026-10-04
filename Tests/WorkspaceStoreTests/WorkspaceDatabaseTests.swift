@@ -81,3 +81,24 @@ struct WorkspaceDatabaseTests {
         #expect(paths.workspaceFolder(id: "abc").path == "/tmp/ReaderTest/workspaces/abc")
     }
 }
+
+struct AppPathsMigrationTests {
+    @Test func dataFolderOfTheOldNameMovesToTheNewName() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let old = base.appendingPathComponent("Reader/workspaces/w1", isDirectory: true)
+        try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+        try "data".write(to: old.appendingPathComponent("workspace.sqlite"), atomically: true, encoding: .utf8)
+        let paths = try AppPaths.standard(base: base)
+        #expect(paths.root.lastPathComponent == "Scholia")
+        #expect(FileManager.default.fileExists(atPath: paths.workspaceFolder(id: "w1").appendingPathComponent("workspace.sqlite").path))
+        #expect(!FileManager.default.fileExists(atPath: base.appendingPathComponent("Reader").path))
+    }
+
+    @Test func existingNewFolderIsNotReplaced() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: base.appendingPathComponent("Reader"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: base.appendingPathComponent("Scholia/keep"), withIntermediateDirectories: true)
+        let paths = try AppPaths.standard(base: base)
+        #expect(FileManager.default.fileExists(atPath: paths.root.appendingPathComponent("keep").path))
+    }
+}

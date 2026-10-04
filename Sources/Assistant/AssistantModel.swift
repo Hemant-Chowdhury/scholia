@@ -138,7 +138,7 @@ public final class AssistantModel {
         do {
             try workspace.database.createThread(thread, anchor: anchor)
         } catch {
-            errorMessage = "Reader cannot save the thread: \(error.localizedDescription)"
+            errorMessage = "Scholia cannot save the thread: \(error.localizedDescription)"
             return
         }
         currentThread = thread

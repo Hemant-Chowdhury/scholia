@@ -56,3 +56,24 @@ struct LibraryTests {
         #expect(library.reader(forWorkspace: id) === second)
     }
 }
+
+struct SettingsMigrationTests {
+    @Test func settingsOfTheOldAppAreCopiedOneTime() {
+        let old = UserDefaults(suiteName: UUID().uuidString)!
+        let new = UserDefaults(suiteName: UUID().uuidString)!
+        old.set("I know Java.", forKey: "aboutMe")
+        old.set("opencode", forKey: "assistant.agent")
+        old.set("haiku", forKey: "assistant.model.claude")
+        old.set(Data("{}".utf8), forKey: "promptTemplates")
+        new.set("New text.", forKey: "aboutMe")
+        SettingsMigration.copyLegacy(from: old, to: new)
+        #expect(new.string(forKey: "aboutMe") == "New text.")
+        #expect(new.string(forKey: "assistant.agent") == "opencode")
+        #expect(new.string(forKey: "assistant.model.claude") == "haiku")
+        #expect(new.data(forKey: "promptTemplates") == Data("{}".utf8))
+        old.set("claude", forKey: "assistant.agent")
+        new.removeObject(forKey: "assistant.agent")
+        SettingsMigration.copyLegacy(from: old, to: new)
+        #expect(new.string(forKey: "assistant.agent") == nil)
+    }
+}

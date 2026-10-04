@@ -54,7 +54,7 @@ struct PromptSettings: View {
     var body: some View {
         Form {
             Section {
-                Text("The assistant also receives the book context: the location, the text around the selection, related passages and earlier questions. These texts tell it what to do with that context. If a field is empty, Reader uses the default text.")
+                Text("The assistant also receives the book context: the location, the text around the selection, related passages and earlier questions. These texts tell it what to do with that context. If a field is empty, Scholia uses the default text.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             ForEach(fields, id: \.title) { field in
@@ -105,7 +105,7 @@ struct AgentSettings: View {
                 Button("Check again") { Task { await load() } }
             }
             Section("Safety") {
-                Text("Agents can only read and search. They cannot change files, run commands or use your account connectors. Reader refuses each request to read a file outside the book's workspace.")
+                Text("Agents can only read and search. They cannot change files, run commands or use your account connectors. Scholia refuses each request to read a file outside the book's workspace.")
                     .font(.callout).foregroundStyle(.secondary)
             }
         }

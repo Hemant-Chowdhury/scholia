@@ -105,7 +105,7 @@ struct AgentHostTests {
             _ = try await host.openSession(agent: AgentCatalog.claude, cwd: URL(fileURLWithPath: "/tmp"))
         }
         #expect(AgentError.notInstalled(name: "Claude Code", missing: ["claude", "npx"]).errorDescription
-            == "Claude Code is not installed. Reader cannot find: claude, npx.")
+            == "Claude Code is not installed. Scholia cannot find: claude, npx.")
     }
 
     @Test func agentThatStoppedIsStartedAgain() async throws {

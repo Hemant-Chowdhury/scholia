@@ -20,6 +20,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" build/Reader.dmg \
-            --title "Reader $GITHUB_REF_NAME" \
-            --notes "Download Reader.dmg, open it, and drag Reader to Applications. The app is not notarized: the first time, right-click Reader and select Open. See the README for details."
+          gh release create "$GITHUB_REF_NAME" build/Scholia.dmg \
+            --title "Scholia $GITHUB_REF_NAME" \
+            --notes "Download Scholia.dmg, open it, and drag Scholia to Applications. The app is not notarized: the first time, right-click Scholia and select Open. See the README for details."

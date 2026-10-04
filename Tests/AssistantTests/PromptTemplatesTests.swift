@@ -15,7 +15,7 @@ struct PromptTemplatesTests {
 
     @Test func standardTemplatesGiveTheBuiltInTexts() {
         let prompt = ContextBuilder.firstPrompt(input(.simplify, .standard))
-        #expect(prompt.hasPrefix("You are a reading tutor in the Reader app."))
+        #expect(prompt.hasPrefix("You are a reading tutor in the Scholia app."))
         #expect(prompt.hasSuffix("Task: Explain the selected text in the simplest words, for a smart beginner. Use one concrete everyday example. Keep it short."))
     }
 

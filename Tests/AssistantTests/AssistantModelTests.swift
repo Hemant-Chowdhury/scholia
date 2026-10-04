@@ -142,7 +142,7 @@ struct AssistantModelTests {
         f.model.selectAgent("claude")
         f.model.start(action: .explain, question: nil, locator: f.locator, selectedText: "Agents.")
         try await waitUntilIdle(f.model)
-        #expect(f.model.errorMessage == "Claude Code is not installed. Reader cannot find: claude.")
+        #expect(f.model.errorMessage == "Claude Code is not installed. Scholia cannot find: claude.")
         #expect(f.model.messages.last?.status == "failed")
     }
 

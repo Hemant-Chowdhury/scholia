@@ -88,7 +88,7 @@ public final class ReaderModel {
         do {
             try workspace.database.setLastPage(pageIndex, documentID: workspace.document.id)
         } catch {
-            lastError = "Reader cannot save the current page: \(error.localizedDescription)"
+            lastError = "Scholia cannot save the current page: \(error.localizedDescription)"
         }
     }
 
@@ -177,7 +177,7 @@ public final class ReaderModel {
             try workspace.database.addHighlight(highlight, anchor: anchor)
             try reloadHighlights()
         } catch {
-            lastError = "Reader cannot save the highlight: \(error.localizedDescription)"
+            lastError = "Scholia cannot save the highlight: \(error.localizedDescription)"
         }
     }
 
@@ -188,7 +188,7 @@ public final class ReaderModel {
             }
             try reloadHighlights()
         } catch {
-            lastError = "Reader cannot remove the highlight: \(error.localizedDescription)"
+            lastError = "Scholia cannot remove the highlight: \(error.localizedDescription)"
         }
     }
 
@@ -274,7 +274,7 @@ public final class ReaderModel {
                 return
             } catch {
                 await MainActor.run { [weak self] in
-                    self?.lastError = "Reader cannot index this document: \(error.localizedDescription)"
+                    self?.lastError = "Scholia cannot index this document: \(error.localizedDescription)"
                 }
             }
         }

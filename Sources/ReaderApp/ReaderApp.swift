@@ -22,12 +22,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ProcessTransport.terminateAll()
     }
 
-    /// Finder: double-click or "Open With › Reader".
+    /// Finder: double-click or "Open With › Scholia".
     func application(_ application: NSApplication, open urls: [URL]) {
         OpenQueue.shared.add(urls)
         // With no window, nothing takes the queue; the start window opens and takes it.
         if !NSApp.windows.contains(where: \.isVisible),
-           let item = NSApp.windowsMenu?.items.first(where: { $0.title == "Reader" }),
+           let item = NSApp.windowsMenu?.items.first(where: { $0.title == "Scholia" }),
            let menu = item.menu {
             menu.performActionForItem(at: menu.index(of: item))
         }
@@ -49,7 +49,13 @@ struct OpenQueueHandler: ViewModifier {
 @main
 struct ReaderApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @State private var library = Library(paths: Self.dataRootOverride)
+    @State private var library: Library
+
+    init() {
+        // Before anything reads the settings or the data folder of the old app name.
+        SettingsMigration.copyLegacy()
+        _library = State(initialValue: Library(paths: Self.dataRootOverride))
+    }
 
     /// Debug builds can use another data folder (READER_DATA_ROOT), so a self-test does not touch real data.
     private static var dataRootOverride: AppPaths? {
@@ -61,7 +67,7 @@ struct ReaderApp: App {
     }
 
     var body: some Scene {
-        Window("Reader", id: "library") {
+        Window("Scholia", id: "library") {
             LibraryView(library: library)
                 .modifier(OpenQueueHandler())
         }

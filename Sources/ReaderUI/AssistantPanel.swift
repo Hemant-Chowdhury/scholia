@@ -233,7 +233,7 @@ struct AgentSetupView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Set up an agent").font(.headline)
-                Text("Reader uses the AI agents on your Mac and the subscriptions that you already have.")
+                Text("Scholia uses the AI agents on your Mac and the subscriptions that you already have.")
                     .foregroundStyle(.secondary)
                 ForEach(agents) { AgentStatusRow(availability: $0) }
             }

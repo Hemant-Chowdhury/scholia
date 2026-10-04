@@ -44,7 +44,7 @@ public final class Library {
         do {
             manager = try WorkspaceManager(paths: paths ?? AppPaths.standard())
         } catch {
-            startupError = "Reader cannot open its data folder: \(error.localizedDescription)"
+            startupError = "Scholia cannot open its data folder: \(error.localizedDescription)"
         }
         self.manager = manager
         self.startupError = startupError

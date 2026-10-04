@@ -87,7 +87,7 @@ public actor ACPClient {
                 "fs": .object(["readTextFile": .bool(false), "writeTextFile": .bool(false)]),
                 "terminal": .bool(false),
             ]),
-            "clientInfo": .object(["name": .string("Reader"), "version": .string("0.1")]),
+            "clientInfo": .object(["name": .string("Scholia"), "version": .string("0.1")]),
         ]))
     }
 
@@ -164,7 +164,7 @@ public actor ACPClient {
     static func requestReply(_ method: String, _ params: JSONValue) -> JSONRPCReply {
         method == "session/request_permission"
             ? permissionReply(params)
-            : .error(code: -32601, message: "Reader does not support \(method).")
+            : .error(code: -32601, message: "Scholia does not support \(method).")
     }
 
     static func permissionReply(_ params: JSONValue) -> JSONRPCReply {
